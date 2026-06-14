@@ -1,0 +1,12 @@
+# Python virtual environments (local runtime, do not commit)
+backend/.venv/
+.venv/
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local config with secrets (use config/app.example.yaml)
+config/app.yaml
