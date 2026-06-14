@@ -1,0 +1,34 @@
+app:
+  name: personal-kb
+  timezone: Asia/Shanghai
+  pipeline_version: v1.1
+
+storage:
+  source_registry_root: /home/szf/dev/data/personal-kb/source_registry
+  raw_vault_root: /home/szf/dev/data/personal-kb/raw_vault
+  parsed_root: /home/szf/dev/data/personal-kb/parsed
+  curated_root: /home/szf/dev/data/personal-kb/curated
+  quarantine_root: /home/szf/dev/data/personal-kb/quarantine
+  reports_root: /home/szf/dev/data/personal-kb/reports
+
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  database: personal_kb
+  username: personal_kb
+  password: mahound
+  charset: utf8mb4
+
+parser:
+  max_workers: 2
+  timeout_seconds: 1800
+  retry_count: 2
+  default_parser_profile: default_v1
+
+quality:
+  pass_score: 80
+  low_score: 60
+
+raw:
+  original_files_readonly: true
+  copy_unique_content_to_vault: true
