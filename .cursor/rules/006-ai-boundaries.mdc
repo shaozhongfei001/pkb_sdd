@@ -1,0 +1,12 @@
+---
+description: AI tool boundaries
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# AI Tool Boundaries
+
+- AI may generate code only within target task scope.
+- AI must not invent undocumented database fields.
+- AI must not introduce cloud API dependencies by default.
+- If a design gap is found, update Spec or Plan first.

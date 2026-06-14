@@ -1,0 +1,23 @@
+---
+description: Personal KB project global rules
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Personal KB Global Rules
+
+- Do not implement source code analysis in this project.
+- Do not move, delete, rename, or overwrite original user files.
+- Do not auto-delete duplicates.
+- Do not upload private documents to external services by default.
+- Do not introduce new frameworks without updating the relevant Spec and Plan.
+- Do not change database schema without adding a migration script.
+
+Core concepts:
+
+- file_instance: one physical path where a file appears.
+- file_content: one unique content object identified by SHA256.
+- raw_vault: content-addressed vault for unique original file copies.
+- parsed: parsing outputs by SHA256 and parser profile.
+- curated: project-level distilled knowledge assets.
+- evidence: source-backed references to original document positions.

@@ -1,0 +1,12 @@
+---
+description: Testing rules
+globs: ["tests/**/*.py", "backend/**/*.py"]
+alwaysApply: true
+---
+
+# Testing Rules
+
+- Cover Chinese paths and filenames.
+- Verify original files are not modified.
+- Duplicate tests must verify one content maps to multiple file instances.
+- Avoid tests requiring external network.

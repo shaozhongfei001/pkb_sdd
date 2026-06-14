@@ -1,0 +1,20 @@
+---
+description: SDD workflow rules
+globs: ["specs/**/*.md", "backend/**/*.py", "tests/**/*.py", "sql/**/*.sql"]
+alwaysApply: true
+---
+
+# SDD Workflow Rules
+
+Before implementation, read:
+
+1. docs/sdd_development_standard.md
+2. target spec.md
+3. target plan.md
+4. target tasks.md
+5. target acceptance.md
+
+Implement only tasks explicitly listed in tasks.md.
+Do not expand feature scope.
+Preserve original file safety rules.
+Keep CLI operations idempotent.

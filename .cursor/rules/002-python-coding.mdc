@@ -1,0 +1,14 @@
+---
+description: Python coding standard
+globs: ["backend/**/*.py", "tests/**/*.py"]
+alwaysApply: true
+---
+
+# Python Coding Rules
+
+- Use Python 3.11+.
+- Prefer type hints.
+- Use pathlib.Path.
+- Avoid business logic in FastAPI route functions.
+- Batch operations must tolerate per-file failure.
+- Do not swallow exceptions silently.

@@ -1,0 +1,14 @@
+---
+description: Database and migration rules
+globs: ["sql/**/*.sql", "backend/app/models/**/*.py", "backend/app/services/**/*.py"]
+alwaysApply: true
+---
+
+# Database Rules
+
+- MySQL is the system database.
+- Distinguish file_instance and file_content.
+- Do not use filename as identity.
+- Use SHA256 content hash for content identity.
+- Schema changes require migration files.
+- Do not store large binary files in MySQL.

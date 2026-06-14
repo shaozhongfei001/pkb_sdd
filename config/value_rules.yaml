@@ -1,0 +1,5 @@
+levels:
+  A: {name: 核心资产, min_score: 80}
+  B: {name: 过程证据, min_score: 60}
+  C: {name: 低频归档, min_score: 35}
+  D: {name: 隔离候选, min_score: 0}

@@ -1,0 +1,12 @@
+---
+description: Parser integration rules
+globs: ["backend/app/services/*parser*.py", "config/parser_rules.yaml", "config/quality_actions.yaml"]
+alwaysApply: true
+---
+
+# Parser Rules
+
+- MarkItDown handles ordinary Office, HTML, XML, JSON, TXT files.
+- MinerU handles PDF, images, scans, complex layout and high-value documents.
+- Parser output goes under parsed/by_hash/{sha256_prefix}/{sha256}/{parser_profile}/.
+- Same content with same parser profile must be idempotent.

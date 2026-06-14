@@ -1,0 +1,21 @@
+routing_rules:
+  - name: pdf_to_mineru
+    priority: 100
+    match:
+      ext: [".pdf"]
+    parser: mineru
+    parser_profile: mineru_default_v1
+
+  - name: image_to_mineru
+    priority: 100
+    match:
+      ext: [".png", ".jpg", ".jpeg", ".tiff", ".bmp"]
+    parser: mineru
+    parser_profile: mineru_default_v1
+
+  - name: office_to_markitdown
+    priority: 50
+    match:
+      ext: [".docx", ".pptx", ".xlsx", ".doc", ".ppt", ".xls"]
+    parser: markitdown
+    parser_profile: markitdown_default_v1

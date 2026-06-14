@@ -1,0 +1,7 @@
+quality_actions:
+  - name: reparse_markitdown_low_quality_with_mineru
+    condition:
+      parser_name: markitdown
+      quality_score_lt: 60
+      value_level: ["A", "B"]
+    action: reparse_with_mineru

@@ -1,0 +1,6 @@
+projects:
+  - project_code: uncategorized
+    project_name: 未归属项目池
+    aliases: [未归属, 待分类]
+    domain: 未分类
+    keywords: [待分类, 未知项目]
