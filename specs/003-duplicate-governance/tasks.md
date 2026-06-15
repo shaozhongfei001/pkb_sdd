@@ -375,6 +375,12 @@ govern 前后 `original.bin` 及 vault 目录 listing 不变。
 
 Dev 完成后 STOP；由 **QA** 执行 A001–A006，**Handoff** 写交接文档；Dev 本 task 仅勾选自测完成项。
 
+### Handoff 文档
+
+```text
+docs/handoff-phase1-003-duplicate-governance.md
+```
+
 ### 允许修改范围
 
 - Dev：`specs/003-duplicate-governance/tasks.md` 勾选 T001–T013
@@ -388,9 +394,9 @@ Dev 完成后 STOP；由 **QA** 执行 A001–A006，**Handoff** 写交接文档
 
 ### 验收标准
 
-- [ ] Dev 已输出：修改文件清单、pytest 命令、CLI 命令、遗留问题
-- [ ] 全链路：`pytest -q tests/test_inventory_scanner.py tests/test_file_content_vault.py tests/test_duplicate_governance.py` 通过
-- [ ] STOP → **DB Agent** → **E2E QA** → **Handoff Agent** → **TL Final Review**
+- [x] Dev 已输出：修改文件清单、pytest 命令、CLI 命令、遗留问题
+- [x] 全链路：`pytest -q tests/test_inventory_scanner.py tests/test_file_content_vault.py tests/test_duplicate_governance.py` 通过
+- [x] STOP → **DB Agent** → **E2E QA** → **Handoff Agent** → **TL Final Review**
 
 ---
 
@@ -411,7 +417,7 @@ Dev 完成后 STOP；由 **QA** 执行 A001–A006，**Handoff** 写交接文档
 | T011 | 原始文件保护 | [x] |
 | T012 | raw_vault 保护 | [x] |
 | T013 | 幂等 | [x] |
-| T014 | 验收交接（STOP→DB/QA/HO） | [ ] |
+| T014 | 验收交接（STOP→DB/QA/HO） | [x] |
 
 ---
 
