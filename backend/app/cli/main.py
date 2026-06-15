@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from app.core.config import DEFAULT_CONFIG_PATH, load_config
+from app.services.duplicate_governance import DuplicateGovernanceService
 from app.services.file_content_vault import FileContentVaultService
 from app.services.inventory_scanner import InventoryScanner
 
@@ -86,6 +87,51 @@ def copy_to_vault(
     console.print(f"Skipped (already copied): {result.skipped}")
     console.print(f"Metadata refreshed: {result.metadata_refreshed}")
     console.print(f"Errors: {len(result.errors)}")
+
+
+@app.command("govern-duplicates")
+def govern_duplicates(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of duplicate candidate contents to process.",
+    ),
+    sha256: str | None = typer.Option(
+        None,
+        "--sha256",
+        help="Process only the specified content sha256.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Process only the specified content uid (same as sha256 in 001).",
+    ),
+) -> None:
+    config_path = config or DEFAULT_CONFIG_PATH
+    app_config = load_config(config_path)
+    service = DuplicateGovernanceService(app_config)
+    result = service.govern_duplicates(
+        limit=limit,
+        sha256=sha256,
+        content_uid=content_uid,
+    )
+
+    console.print(f"Candidates: {result.candidates}")
+    console.print(f"Groups processed: {result.groups_processed}")
+    console.print(f"Groups upserted: {result.groups_upserted}")
+    console.print(f"Instances linked: {result.instances_linked}")
+    console.print(f"Suggestions generated: {result.suggestions_generated}")
+    console.print(f"Skipped (unchanged): {result.skipped}")
+    console.print(f"Errors: {len(result.errors)}")
+    if result.duplicate_report_path is not None:
+        console.print(f"Duplicate report: {result.duplicate_report_path}")
+    if result.cleanup_suggestion_report_path is not None:
+        console.print(f"Cleanup suggestion report: {result.cleanup_suggestion_report_path}")
 
 
 @app.command("build-parse-queue")
