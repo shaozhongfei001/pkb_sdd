@@ -1,7 +1,7 @@
 # Test Cases: MarkItDown 普通文档解析（005）
 
 > **Plan 对照**：`plan.md` §23  
-> **验收对照**：`acceptance.md` A001–A017
+> **验收对照**：`acceptance.md` A001–A018
 
 ---
 
@@ -55,7 +55,7 @@
 | **TC023** | `--limit` filter | `--limit 3` | 最多 3 个 in-scope |
 | **TC024** | 无 filter 拒绝 | 无任何 filter 参数 | exit non-zero |
 | **TC025** | limit 上限 | `--limit 101` | exit non-zero |
-| **TC026** | `--dry-run` | `--dry-run --limit 5` | parsed 目录无新增/修改；report `dry_run=true` |
+| **TC026** | `--dry-run` | `--dry-run --limit 5` | **不调用** MarkItDownAdapter.convert；parsed 目录无新增/修改；report `dry_run=true` |
 
 ---
 
@@ -64,7 +64,28 @@
 | 编号 | 场景 | 输入 | 预期 |
 |------|------|------|------|
 | **TC027** | existing success skip | 连续两次 parse 同 sha256 | 第二次 skip；三文件 hash 不变 |
-| **TC028** | report summary | 混合 success/skip/fail | `parsed_count`/`skipped_count`/`failed_count`/`empty_count` 与 items 一致 |
+| **TC028** | report summary | 混合 success/skip/fail | `total_candidates`=SQL 行数；`in_scope_candidates` 与 items 一致；计数正确 |
+
+---
+
+## vault 路径 — 002 权威（P4 TL）
+
+| 编号 | 场景 | 输入 | 预期 |
+|------|------|------|------|
+| **TC038** | vault 路径 via helpers | mock sha256 | `_resolve_original_bin` 等价于 `build_vault_artifact_paths(build_vault_dir(root, sha256)).original_bin` |
+| **TC039** | 禁止 raw_vault 三档 | 代码审查 / grep | 无 `{sha256[2:4]}` 拼接用于 raw_vault；parsed 三档仅出现在 `parsed_paths.py` |
+| **TC040** | 禁止改 vault_paths | git diff | `vault_paths.py`、`file_content_vault.py` 不在 P5 diff 中 |
+
+---
+
+## 测试策略 — mock vs 真实 markitdown（P4 TL）
+
+| 编号 | 场景 | 输入 | 预期 |
+|------|------|------|------|
+| **TC041** | 默认 mock adapter | 绝大多数 pytest | `MarkItDownAdapter.convert` 被 mock；不依赖 Office 运行时 |
+| **TC042** | 真实 markitdown txt/md | 可选集成测试 `.txt`/`.md` fixture | 可调用真实 markitdown；docx/pptx/xlsx **仍 mock** |
+| **TC043** | FAILED 仅 manifest | mock convert 抛错 | 存在 `parse_manifest.json` status=FAILED；**无** `parsed_text.md` |
+| **TC044** | limit 不计 out-of-scope skip | 混合 pdf+docx，`--limit 1` | 仅 1 次 in-scope parse；pdf skip 不占 limit |
 
 ---
 
@@ -100,10 +121,12 @@
 | TC010–TC014 | `test_skip_pdf`、`test_skip_image`、`test_skip_unknown`、`test_skip_unsupported` |
 | TC015–TC020 | `test_missing_original_bin`、`test_corrupted_document`、… |
 | TC021–TC026 | `test_cli_sha256_filter`、`test_cli_no_filter_rejected`、`test_cli_dry_run` |
-| TC027–TC028 | `test_idempotent_skip_success`、`test_report_summary_counts` |
+| TC027–TC028, TC044 | `test_idempotent_skip_success`、`test_report_summary_counts`、`test_limit_excludes_out_of_scope_skip` |
 | TC029–TC033 | `test_no_db_write`、`test_raw_vault_unchanged`、`test_original_files_unchanged` |
 | TC034–TC037 | `test_parse_markitdown_integration`、`test_chinese_path_integration` |
+| TC038–TC040 | `test_resolve_original_bin_via_vault_paths`、`test_no_raw_vault_three_tier_path`、`test_vault_paths_not_modified` |
+| TC041–TC043 | mock 默认 + 可选 `test_real_markitdown_txt_integration`、`test_failed_writes_manifest_only` |
 
 ---
 
-**Test Cases 结束** — 共 **37** 条；Dev 实现时须全部可映射到 pytest 或 QA 手工步骤。
+**Test Cases 结束** — 共 **44** 条；Dev 实现时须全部可映射到 pytest 或 QA 手工步骤。

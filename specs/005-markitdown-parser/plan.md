@@ -121,15 +121,51 @@ if decision != "ROUTE" or route_type not in IN_SCOPE_ROUTE_TYPES:
 IN_SCOPE_ROUTE_TYPES = {DOCX, PPTX, XLSX, TEXT_OR_MARKDOWN}
 ```
 
-### 5.3 raw_vault original.bin
+### 5.3 raw_vault original.bin（002 权威 — 两档）
+
+**P4 TL 裁决**：raw_vault 路径以 **002 实现** 为唯一权威；005 **不得**硬编码三档 raw_vault 路径；**不得**修改 `vault_paths.py` 或 `file_content_vault.py`；**不得**做 raw_vault 迁移。
+
+**002 权威公式**：
 
 ```text
-{raw_vault_root}/by_hash/{sha256[0:2].lower()}/{sha256[2:4].lower()}/{sha256}/original.bin
+{raw_vault_root}/by_hash/{sha256[0:2].lower()}/{sha256}/original.bin
 ```
 
-- 优先使用 DB `vault_path` 指向的目录 + `original.bin`
-- 可复用 `backend/app/core/vault_paths.py` 中 `build_vault_dir()` / `build_vault_artifact_paths()`（只读）
-- 文件必须以 **二进制只读** 打开；不得 truncate/write
+对应 002 实现（`backend/app/core/vault_paths.py`）：
+
+```python
+def build_vault_dir(raw_vault_root: Path, sha256: str) -> Path:
+    prefix = sha256[:2].lower()
+    return raw_vault_root / "by_hash" / prefix / sha256
+
+def build_vault_artifact_paths(vault_dir: Path) -> VaultArtifactPaths:
+    ...
+    original_bin=vault_dir / "original.bin"
+```
+
+**005 必须**：
+
+```python
+vault_dir = build_vault_dir(config.storage.raw_vault_root, sha256)
+original_bin = build_vault_artifact_paths(vault_dir)["original_bin"]
+```
+
+**005 service 允许**在 `markitdown_parser.py` 内封装私有方法（内部仍调用 002 helpers）：
+
+```text
+_resolve_vault_dir(raw_vault_root, sha256) -> Path
+_resolve_original_bin(raw_vault_root, sha256) -> Path
+```
+
+**005 禁止**：
+
+- 自行拼接 `{sha256[2:4]}/` 作为 raw_vault 中间目录（该扇出 **仅** 用于 `parsed/`，见 §8）
+- 修改 `backend/app/core/vault_paths.py`
+- 修改 `backend/app/services/file_content_vault.py`
+
+DB `vault_path` 列可用于 **校验**（可选 WARNING：与 `build_vault_dir()` 不一致时 log，但 **解析输入仍以 helpers 为准**）。
+
+文件必须以 **二进制只读** 打开；不得 truncate/write。
 
 ---
 
@@ -194,7 +230,9 @@ parser_adapter_version = "005_mvp_v1"
 
 ---
 
-## 8. parsed 目录结构
+## 8. parsed 目录结构（005 三档 — 与 raw_vault 两档独立）
+
+> **路径区分（P4 TL 裁决）**：`raw_vault` 沿用 **002 两档**；`parsed/` 采用 **005 MVP 三档** 新约定。二者 **不得混用**。
 
 ```text
 {parsed_root}/
@@ -209,8 +247,8 @@ parser_adapter_version = "005_mvp_v1"
 
 **说明**：
 
-- 两级 prefix（`[0:2]` + `[2:4]`）用于目录扇出；末级目录名为完整 `sha256`
-- **005 MVP 不使用** `parser_profile` 子目录（与 `004-parser.mdc` 中带 profile 的路径不同）；profile 信息写入 `parse_manifest.json` 字段
+- parsed 使用 **三档** prefix（`[0:2]` + `[2:4]` + 完整 `sha256`）；由 `parsed_paths.py` 构建，**不**复用 `build_vault_dir()`
+- **005 MVP 不使用** `parser_profile` 子目录；profile 信息写入 `parse_manifest.json` 字段
 - 路径由 `parsed_root` + content `sha256` 确定性生成
 
 **建议新增模块**：`backend/app/core/parsed_paths.py`
@@ -270,7 +308,7 @@ def build_parsed_artifact_paths(parsed_dir: Path) -> ParsedArtifactPaths: ...
 | 编码 | **UTF-8**（无 BOM） |
 | 格式 | Markdown 或 plain text（MarkItDown 输出） |
 | 空输出 | 仍写文件（0 字节或仅换行）；`parse_manifest.json` 中 `status=EMPTY` |
-| 失败 | **不**写 `parsed_text.md`（或写空文件 — Dev 二选一，须在测试中固定；**推荐**：失败时不写 text，仅 manifest/report 记录 FAILED） |
+| 失败（P4 TL） | **写** `parse_manifest.json`（`status=FAILED` + `error`）；**不写** `parsed_text.md`；**不写** `parsed_metadata.json`（MVP 允许省略，或写最小 stub — Dev 须在测试中固定一种；**推荐**：FAILED 时仅 manifest） |
 | 原始文件 | 005 不修改 vault bin；parsed_text 是 **新文件** |
 
 ---
@@ -293,9 +331,10 @@ def build_parsed_artifact_paths(parsed_dir: Path) -> ParsedArtifactPaths: ...
     "limit": 10
   },
   "summary": {
-    "total_candidates": 5,
+    "total_candidates": 8,
+    "in_scope_candidates": 5,
     "parsed_count": 2,
-    "skipped_count": 2,
+    "skipped_count": 3,
     "failed_count": 1,
     "empty_count": 0
   },
@@ -322,13 +361,14 @@ def build_parsed_artifact_paths(parsed_dir: Path) -> ParsedArtifactPaths: ...
 
 | 字段 | 说明 |
 |------|------|
-| `total_candidates` | MySQL 查询后、route 过滤前的候选数（或过滤后待处理数 — Dev 须在实现中固定一种并在 report 注明；**推荐**：route 过滤后的 in-scope 列表长度 + skipped out-of-scope 单列） |
+| `total_candidates` | **MySQL 查询候选行数**（§5.1 条件 + CLI filter 后、route 过滤 **前**） |
+| `in_scope_candidates` | route 过滤后 `route_type ∈ {DOCX,PPTX,XLSX,TEXT_OR_MARKDOWN}` 且 `decision=ROUTE` 的数量 |
 | `parsed_count` | `status=SUCCESS` |
-| `skipped_count` | out-of-scope route 或幂等 skip |
+| `skipped_count` | out-of-scope route skip + 幂等 skip（**不计入** `--limit`） |
 | `failed_count` | `status=FAILED` |
 | `empty_count` | `status=EMPTY` |
 
-**`--dry-run`**：`dry_run=true`；不写 parsed 三文件；`items[]` 仍列出 would-parse / would-skip。
+**`--dry-run`（P4 TL）**：`dry_run=true`；**不调用** MarkItDownAdapter.convert；不写 parsed 三文件；仍执行 MySQL 候选查询、route 筛选、vault/parsed 路径解析、幂等判定；`items[]` 标注 would_parse / would_skip。
 
 ---
 
@@ -343,8 +383,8 @@ python -m app.cli.main parse-markitdown [OPTIONS]
 | `--config PATH` | 默认 `config/app.yaml` |
 | `--sha256 HEX` | 仅处理指定内容 |
 | `--content-uid UID` | 同 `--sha256` |
-| `--limit N` | 最多处理 N 个 **in-scope** 候选（应用 route 过滤后） |
-| `--dry-run` | 不写 parsed；仍写 report |
+| `--limit N` | 最多执行 N 次 **in-scope parse 动作**（route 过滤后）；out-of-scope skip **不计入** limit |
+| `--dry-run` | 不调用 MarkItDown；不写 parsed；仍写 report（would_parse / would_skip） |
 
 **执行流程**：
 
@@ -377,8 +417,10 @@ python -m app.cli.main parse-markitdown [OPTIONS]
 
 ### 14.3 `--dry-run`
 
+- **不调用** `MarkItDownAdapter.convert()`（不 import/执行 markitdown 解析）
+- 仍执行：MySQL 候选查询、route 筛选、vault/parsed 路径解析、幂等判定
 - 不创建/不修改 `parsed/` 下任何文件
-- 仍生成 `parse_markitdown_report_*.json`（记录 would-parse）
+- 仍生成 `parse_markitdown_report_*.json`（`items[]` 标注 would_parse / would_skip）
 
 ### 14.4 单条失败不中断
 
@@ -469,13 +511,14 @@ python -m app.cli.main parse-markitdown [OPTIONS]
 
 ## 20. 依赖策略
 
-| 项 | Plan 决策 |
-|----|-----------|
+| 项 | Plan 决策（P4 TL） |
+|----|-------------------|
 | MarkItDown | 项目 `backend/requirements.txt` 已含 `markitdown[all]>=0.1.0` |
 | 新增 PyPI 包 | **005 MVP 默认不新增** |
-| Dev 第一步 | 检查 `requirements.txt` / 是否存在 `pyproject.toml`；复用现有 pin |
-| Plan Repair | **不安装**、不运行 parser |
-| Office 运行时 | 文档说明 docx/pptx/xlsx 可能依赖系统库；测试用 mock 或最小 fixtures |
+| `requirements.txt` | **P5 默认不修改**；Dev 第一步验证该条目存在 |
+| 若依赖缺失 | Dev **STOP → TL** 重新批准依赖策略；**不得**自行改 requirements |
+| Office 运行时 | docx/pptx/xlsx 可能依赖系统库；**pytest 默认 mock adapter** |
+| 真实 markitdown 集成测试 | **仅限**轻量 `.txt` / `.md` fixture（可选 1–2 个）；Office 用 mock |
 
 ---
 
@@ -484,17 +527,20 @@ python -m app.cli.main parse-markitdown [OPTIONS]
 | 操作 | 文件 |
 |------|------|
 | **新增** | `backend/app/core/parsed_paths.py` |
-| **新增** | `backend/app/adapters/markitdown_adapter.py`（或 `backend/app/core/markitdown_adapter.py` — Dev 二选一，**不可同时**） |
-| **新增** | `backend/app/services/markitdown_parser.py` |
+| **新增** | `backend/app/adapters/markitdown_adapter.py` |
+| **新增** | `backend/app/services/markitdown_parser.py`（含 `_resolve_vault_dir` / `_resolve_original_bin`） |
 | **修改** | `backend/app/cli/main.py`（新增 `parse-markitdown`） |
 | **新增** | `backend/tests/test_markitdown_parser.py` |
-| **修改** | `backend/requirements.txt`（**仅当** DB/TL 确认需 pin 版本；默认不改） |
 | **修改** | `specs/005-markitdown-parser/tasks.md`（勾选） |
 
-**只读 import（不改文件）**：
+**P5 默认禁止修改**：
+
+- `backend/requirements.txt`（除非 TL 重新批准依赖策略）
+
+**只读 import（禁止修改文件内容）**：
 
 - `backend/app/core/parser_routing.py`
-- `backend/app/core/vault_paths.py`
+- `backend/app/core/vault_paths.py`（**P4：禁止修改**）
 - `backend/app/core/config.py`
 
 ---
@@ -503,10 +549,12 @@ python -m app.cli.main parse-markitdown [OPTIONS]
 
 ```text
 backend/app/services/inventory_scanner.py
-backend/app/services/file_content_vault.py
+backend/app/services/file_content_vault.py   # P4：禁止修改
 backend/app/services/duplicate_governance.py
 backend/app/services/parser_router.py
-backend/app/core/parser_routing.py      # 005 只读 import，禁止改规则
+backend/app/core/vault_paths.py              # P4：禁止修改；005 只读 import
+backend/app/core/parser_routing.py           # 005 只读 import，禁止改规则
+backend/requirements.txt                     # P5 默认禁止；须 TL 重新批准
 backend/app/models/file.py
 backend/app/models/vault.py
 backend/app/models/duplicate.py
@@ -538,13 +586,16 @@ specs/其他编号/**
 | 用例类 | 覆盖 |
 |--------|------|
 | route 筛选 | DOCX/PPTX/XLSX/TEXT 进入；PDF/IMAGE/UNKNOWN/UNSUPPORTED skip |
-| adapter | mock markitdown；import failure |
-| 产物路径 | 三文件路径与 §8 一致 |
-| manifest 字段 | §9 必填字段 |
+| vault 路径 | `_resolve_original_bin` 经 `build_vault_dir` + `build_vault_artifact_paths`；**禁止**三档 raw_vault |
+| adapter | **默认 mock** `MarkItDownAdapter.convert`；import failure |
+| 真实 markitdown | **仅**轻量 `.txt`/`.md` 集成（可选）；Office 一律 mock |
+| 产物路径 | parsed 三档 §8；raw_vault 两档 §5.3 |
+| manifest 字段 | §9 必填；FAILED 仅 manifest |
 | 幂等 | 第二次 SUCCESS skip |
-| dry-run | 无 parsed 写入 |
+| dry-run | 无 MarkItDown 调用；无 parsed 写入 |
+| limit 语义 | out-of-scope skip 不计入 limit |
 | 护栏 | 无 filter → exit non-zero；limit > 100 → reject |
-| 保护 | original + raw_vault 不变 |
+| 保护 | original + raw_vault 不变；vault_paths.py 未改 |
 | 无 DB 写 | mock session 或 SQL 计数 |
 | 中文路径 | fixtures 全链路 |
 
@@ -660,7 +711,15 @@ pytest -q tests/test_inventory_scanner.py tests/test_file_content_vault.py \
 | **Q7** | TEXT_OR_MARKDOWN | **纳入** 005（含 html/xml/json/txt/md/csv） |
 | **Q8** | `--force-reparse` | **MVP 不实现** |
 | **Q9** | 全局 import 失败 | exit non-zero；不 partially write parsed |
+| **Q10** | raw_vault 路径 | **002 两档**；`build_vault_dir` + `build_vault_artifact_paths`；禁止三档 raw_vault |
+| **Q11** | parsed 路径 | **005 三档** §8；与 raw_vault 独立 |
+| **Q12** | FAILED 产物 | 写 `parse_manifest.json`（FAILED+error）；**不写** `parsed_text.md` |
+| **Q13** | `--limit` | 仅 in-scope parse 动作；out-of-scope skip 不计入 |
+| **Q14** | `--dry-run` | 不调用 MarkItDown；仍做路由/路径/幂等/report |
+| **Q15** | 测试策略 | 默认 mock adapter；真实 markitdown 仅 txt/md |
+| **Q16** | report 计数 | `total_candidates`=SQL 行数；增 `in_scope_candidates` |
+| **Q17** | requirements.txt | P5 **默认不改**；缺失则 STOP → TL |
 
 ---
 
-**Plan 结束** — STOP → **DB Agent Plan Re-Review** → Dev 只读方案 → TL 批准 → Dev Implementation。
+**Plan 结束** — P4 TL 已批准 → **P5 Dev Implementation**。
