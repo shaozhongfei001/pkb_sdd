@@ -15,7 +15,7 @@
 | **P2** | DB | Plan Review | [x] PASS_WITH_NOTES |
 | **P3** | Dev | 只读实现方案（不写代码） | [x] |
 | **P4** | TL | Review & Approval + Plan Repair | [x] APPROVED_FOR_P5 |
-| **P5** | Dev | Implementation（白名单内） | [ ] |
+| **P5** | Dev | Implementation（白名单内） | [x] |
 | **P6** | DB | Implementation Review | [ ] |
 | **P7** | QA | E2E 验收 A001–A019 | [ ] |
 | **P8** | HO | Handoff 文档 | [ ] |
@@ -165,32 +165,32 @@ specs/006-parse-job-registry/plan.md
 
 ### T009 编写 migration
 
-- [ ] `006_parse_registry_v1.sql` 含 `uk_artifact_scope`（§9.3）
-- [ ] `run_uid` 列 VARCHAR(64)；artifact `run_uid NOT NULL`
+- [x] `006_parse_registry_v1.sql` 含 `uk_artifact_scope`（§9.3）
+- [x] `run_uid` 列 VARCHAR(64)；artifact `run_uid NOT NULL`
 
 ### T010 实现 ORM models
 
-- [ ] 与 migration 一致；含 `uk_artifact_scope` 映射
+- [x] 与 migration 一致；含 `uk_artifact_scope` 映射
 
 ### T011 实现 ParseRegistryService
 
-- [ ] `register_from_report()`：拒绝 `dry_run=true` report
-- [ ] 006 `--dry-run`：零 DB 写
-- [ ] `document_uid = content_uid`
-- [ ] SKIPPED 无 manifest：仅 result，零 artifact
-- [ ] `run_uid` 按 §5.1 生成
+- [x] `register_from_report()`：拒绝 `dry_run=true` report
+- [x] 006 `--dry-run`：零 DB 写
+- [x] `document_uid = content_uid`
+- [x] SKIPPED 无 manifest：仅 result，零 artifact
+- [x] `run_uid` 按 §5.1 生成
 
 ### T012 实现 CLI
 
-- [ ] 全部 006 命令 + 护栏
+- [x] 全部 006 命令 + 护栏
 
 ### T013 实现 pytest
 
-- [ ] 覆盖 M1–M4 / S4 test cases（TC015–TC019 等）
+- [x] 覆盖 M1–M4 / S4 test cases（TC015–TC019 等）
 
 ### T014 Dev 自检 STOP
 
-- [ ] STOP → P6
+- [x] STOP → P6
 
 ---
 
@@ -208,7 +208,7 @@ specs/006-parse-job-registry/plan.md
 | T005 | P2 | [x] PASS_WITH_NOTES |
 | T006–T007 | P3 | [x] |
 | T008–T008b | P4 | [x] APPROVED_FOR_P5 |
-| T009–T014 | P5 | [ ] |
+| T009–T014 | P5 | [x] |
 | T015–T018 | P6–P9 | [ ] |
 
 ---
