@@ -16,9 +16,9 @@
 | **P3** | Dev | 只读实现方案（不写代码） | [x] |
 | **P4** | TL | Review & Approval + Plan Repair | [x] APPROVED_FOR_P5 |
 | **P5** | Dev | Implementation（白名单内） | [x] |
-| **P6** | DB | Implementation Review | [ ] |
-| **P7** | QA | E2E 验收 A001–A019 | [ ] |
-| **P8** | HO | Handoff 文档 | [ ] |
+| **P6** | DB | Implementation Review | [x] PASS_WITH_NOTES |
+| **P7** | QA | E2E 验收 A001–A019 | [x] PASS_WITH_NOTES |
+| **P8** | HO | Handoff 文档 | [x] |
 | **P9** | TL | Final Review / merge 决策 | [ ] |
 
 **门禁**：P2 未 PASS → 不得 P5；P4 未 APPROVED_FOR_P5 → 不得 P5；P6 未 PASS → 不得 P7。
@@ -194,9 +194,49 @@ specs/006-parse-job-registry/plan.md
 
 ---
 
-## P6 — P9
+## P6 — DB Implementation Review
 
-（与 Plan 一致；验收 A001–A019）
+### T015 DB Agent 审查实现
+
+- [x] ORM 与 migration 主结构一致；`uk_artifact_scope` 含 `run_uid`
+- [x] 无阻断 schema / FK 问题；不写 `kb_parse_job`
+- [x] 结论：**PASS_WITH_NOTES**（migration 手动执行；reconcile 无 dedup；共享库并行风险 — 非阻断）
+
+**STOP → P7**
+
+---
+
+## P7 — E2E QA
+
+### T016 QA 验收 A001–A019
+
+- [x] 006 专项 36 passed；全量 120 passed
+- [x] M1–M4 / S1 / S4 测试证据齐全
+- [x] 不解析、不改 raw_vault/parsed、不接 MinerU/OCR
+- [x] 结论：**PASS_WITH_NOTES**（无阻断项）
+
+**STOP → P8**
+
+---
+
+## P8 — Handoff
+
+### T017 Handoff 文档
+
+- [x] `docs/handoff-phase1-006-parse-job-registry.md` 已撰写
+- [x] tasks.md P6–P8 勾选
+
+**STOP → P9**
+
+---
+
+## P9 — TL Final Review
+
+### T018 TL merge 决策
+
+- [ ] 阅读 handoff + plan + tasks（P1–P8 全部 `[x]`）
+- [ ] 文件白名单 / migration 安全 / M1–M4 / 测试结果复核
+- [ ] merge main 裁决
 
 ---
 
@@ -209,8 +249,11 @@ specs/006-parse-job-registry/plan.md
 | T006–T007 | P3 | [x] |
 | T008–T008b | P4 | [x] APPROVED_FOR_P5 |
 | T009–T014 | P5 | [x] |
-| T015–T018 | P6–P9 | [ ] |
+| T015 | P6 | [x] PASS_WITH_NOTES |
+| T016 | P7 | [x] PASS_WITH_NOTES |
+| T017 | P8 | [x] |
+| T018 | P9 | [ ] |
 
 ---
 
-**Tasks 结束** — 当前 STOP 点：**P5 Dev Implementation**（TL 已授权；建议 DB Plan Re-Review §9）。
+**Tasks 结束** — 当前 STOP 点：**P9 Tech Lead Final Review** → merge main → 007/008 Spec Plan。
