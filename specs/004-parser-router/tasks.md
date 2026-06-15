@@ -385,9 +385,9 @@ docs/handoff-phase1-004-parser-router.md
 
 ### 验收标准
 
-- [ ] Dev 已输出：修改文件清单、pytest 命令、CLI 命令、遗留问题
-- [ ] 全链路：`pytest -q tests/test_inventory_scanner.py tests/test_file_content_vault.py tests/test_duplicate_governance.py tests/test_parser_router.py` 通过
-- [ ] STOP → **DB Agent** → **E2E QA** → **Handoff Agent** → **TL Final Review**
+- [x] Dev 已输出：修改文件清单、pytest 命令、CLI 命令、遗留问题
+- [x] 全链路：`pytest -q tests/test_inventory_scanner.py tests/test_file_content_vault.py tests/test_duplicate_governance.py tests/test_parser_router.py` 通过
+- [x] STOP → **DB Agent** → **E2E QA** → **Handoff Agent** → **TL Final Review**
 
 ---
 
@@ -407,7 +407,7 @@ docs/handoff-phase1-004-parser-router.md
 | T010 | 原始文件保护 | [x] |
 | T011 | raw_vault 保护 | [x] |
 | T012 | 幂等性 | [x] |
-| T013 | 验收与 Handoff | [ ] |
+| T013 | 验收与 Handoff | [x] |
 
 ---
 
