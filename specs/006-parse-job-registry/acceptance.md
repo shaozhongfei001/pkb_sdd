@@ -1,7 +1,7 @@
 # Acceptance: Parse Job Registry（006）
 
 > **Spec**：`specs/006-parse-job-registry`  
-> **Plan 对照**：`plan.md` §22、§9–§20  
+> **Plan 对照**：`plan.md` §22、§9–§20、附录 A Q16–Q21  
 > **测试对照**：`test_cases.md`
 
 ---
@@ -28,84 +28,88 @@
 
 - 默认 register/reconcile **只读** parsed 产物
 - `parsed_text.md` / `parsed_metadata.json` / `parse_manifest.json` hash 在 register 前后不变
-- 无 truncate/overwrite parsed（除非未来 TL 授权的显式 repair，MVP 无）
+- 无 truncate/overwrite parsed（MVP 无 repair 子命令）
 
 ## A005 不重新解析文件
 
 - 006 CLI **不** import/call MarkItDown / MinerU / OCR
 - **不** read `original.bin` 做解析
-- 重新解析仅当用户 **显式** 运行 005 `parse-markitdown`（非 006 默认）
+- 重新解析仅当用户 **显式** 运行 005 `parse-markitdown`
 
 ## A006 Parse job（run）可记录一次运行
 
 - `register-parse-report` 创建/upsert **`kb_parse_run`**
-- 含 `run_uid`、`parser_name`、`parser_adapter_version`、`status`、summary 计数、`report_path`、时间戳
-- 同一 report 重复 register 幂等（不 duplicate run）
+- 含 `run_uid`（§5.1 公式）、`parser_name`、`status`、summary、`report_path`、时间戳
+- 同一 report 重复 register 幂等
 
 ## A007 Parse result 可记录单个 content 结果
 
 - 每个 report item + manifest 对应 **`kb_parse_result`** 行
-- 含 `content_uid`、`sha256`、`route_type`、`status`、路径字段、error 字段
+- 含 `content_uid`、`sha256`、`route_type`、`status`、路径、error 字段
 
 ## A008 Parsed artifact 可索引三文件产物
 
-- SUCCESS/EMPTY：`PARSED_TEXT`、`PARSED_METADATA`、`PARSE_MANIFEST` 三类 artifact
-- FAILED：至少 `PARSE_MANIFEST`
-- run 级：`PARSE_REPORT` 索引（可选，Plan Q14）
+- SUCCESS/EMPTY：`PARSED_TEXT`、`PARSED_METADATA`、`PARSE_MANIFEST`（文件存在时）
+- FAILED：`PARSE_MANIFEST`（005 FAILED manifest 存在时）
+- SKIPPED 且无 manifest：**零** artifact 行（S4）
+- run 级：`PARSE_REPORT`（`content_uid=''`）
 
 ## A009 失败原因可追踪
 
 - FAILED result 含 `error_code`、`error_message`
-- 与 manifest `error` 或 report `errors[]` 一致
 
 ## A010 重试关系可追踪
 
-- 同 content 新 result 失败后再成功/失败时，可设置 **`retry_of_result_id`**
-- 查询可还原 retry 链
+- `retry_of_result_id` 可还原 retry 链
 
-## A011 dry-run 不写 DB
+## A011 dry-run 不写 DB（M2 / Q17）
 
-- `register-parse-report --dry-run` 与 `reconcile-parsed-artifacts --dry-run`：
-  - 无 INSERT/UPDATE registry 三表
-  - 无 parse_status / kb_document 变更
-  - 输出 preview / would_register 证据
+- 006 `register-parse-report --dry-run` 与 `reconcile-parsed-artifacts --dry-run`：
+  - **零** INSERT/UPDATE：`kb_parse_run`、`kb_parse_result`、`kb_parsed_artifact`、`kb_document`、`kb_file_content.parse_status`
+  - 禁止 `DRY_RUN_COMPLETED` 或任何 dry-run 状态入库
+  - 可写磁盘 `registry_report_*.json` preview
 
 ## A012 Registry 写入事务一致
 
-- 单 content：result + artifacts + kb_document + parse_status **同一 transaction**
-- 单条失败 rollback 当前 content；不污染其他 content
-- run 终态 summary 与 results 计数一致
+- 单 content persist：result + artifacts + kb_document + parse_status 同一 transaction
+- 单条失败 rollback 当前 content；continue
 
 ## A013 不接 MinerU / OCR
 
 - 无 mineru / ocr import 或 subprocess
-- 不做 PDF / IMAGE 解析
 
 ## A014 不做 curated / vector / project card
 
-- 不写 `curated/`、`kb_curated_asset`、`kb_embedding_ref`、`kb_document_chunk`
-- 无 embedding / LLM / Streamlit 代码路径
+- 不写 curated / chunk / embedding 相关表或目录
 
 ## A015 测试通过
 
-```bash
-# migration（测试环境）
-mysql ... < sql/migrations/006_parse_registry_v1.sql
+- pytest 006 专项 + 001–005 回归 pass（≥25 006 functions）
+- CLI E2E：parse-markitdown（非 dry-run）→ register-parse-report
 
-# 006 专项
-pytest -q tests/test_parse_registry.py
+## A016 Artifact UNIQUE 含 run_uid（M1 / Q16）
 
-# 全链路回归
-pytest -q tests/test_inventory_scanner.py tests/test_file_content_vault.py \
-  tests/test_duplicate_governance.py tests/test_parser_router.py \
-  tests/test_markitdown_parser.py tests/test_parse_registry.py
-```
+- migration 与 ORM 使用 **`uk_artifact_scope(run_uid, content_uid, artifact_type, parser_name, parser_adapter_version)`**
+- **不得**使用 `uk_artifact_content_type(content_uid, ...)`
+- 同一 content 不同 run 可并存多条 artifact 行
 
-- CLI E2E：`scan` → `copy-to-vault` → `parse-markitdown --limit N` → `register-parse-report --report-path ...`
-- reconcile：`reconcile-parsed-artifacts --limit N`（opt-in）可测
-- migration upgrade + 重复 migrate idempotency 测试 pass
-- 006 新增 ≥25 test functions
+## A017 Registry dry-run 零 DB 写（M2 / Q17）
+
+- 006 registry `--dry-run` 前后 MySQL 行数不变（registry 三表 + parse_status + kb_document）
+- 证据：pytest + CLI 前后 SELECT COUNT
+
+## A018 005 dry-run report 拒绝 ingest（M3 / Q18）
+
+- `register-parse-report` 对 `report.dry_run=true`：**exit non-zero**
+- 错误码 **`INVALID_DRY_RUN_REPORT`**
+- **零** registry 行写入
+
+## A019 document_uid 规则（M4 / Q19）
+
+- `kb_document.document_uid` **恒等于** `content_uid`
+- **禁止** sha256 或其它 hash 作为 document_uid 备选
+- QA：`SELECT document_uid, content_uid FROM kb_document` 逐行相等
 
 ---
 
-**Acceptance 结束** — QA 输出验收表时须逐条附证据（MySQL 查询、pytest、CLI 输出、hash/stat）。
+**Acceptance 结束** — QA 须逐条附证据。

@@ -34,9 +34,10 @@ Phase 1 文件治理底座进度：
 | 角色 | 故事 | 验收要点 |
 |------|------|----------|
 | **文档管理员** | 005 跑完 `parse-markitdown` 后，希望 DB 能查到本次批处理的 job 与每条 content 结果 | `register-parse-report` 写入 run + results |
-| **文档管理员** | 希望 parsed 三文件在 DB 中有路径与 hash 索引 | `kb_parsed_artifact` 三类型记录 |
+| **文档管理员** | 希望 parsed 三文件在 DB 中有路径与 hash 索引 | `kb_parsed_artifact`（按 run 范围；SKIPPED 无 manifest 时无 artifact 行） |
 | **运维** | 希望 list/show CLI 查询 job、result、artifact，不必扫全盘 | `list-parse-jobs` 等命令 |
-| **运维** | 希望 dry-run 可预览 registry 将写入什么 | `--dry-run` 不写 DB |
+| **运维** | 希望 dry-run 可预览 registry 将写入什么 | `--dry-run` **零 DB 写**；仅 preview report |
+| **运维** | 005 dry-run report 不得误入 registry | `INVALID_DRY_RUN_REPORT` + exit non-zero |
 | **DB 审查员** | registry 不得破坏 raw_vault / parsed 磁盘产物 | 只读 ingest；无 overwrite |
 | **开发** | 006 不得倒灌修改 005 `markitdown_parser.py` | 独立 registry service + register CLI |
 
@@ -50,8 +51,9 @@ Phase 1 文件治理底座进度：
 4. 提供 **`reconcile-parsed-artifacts`**（**显式 opt-in**）：从已有 `parsed/` 扫描 manifest 补齐 registry，**不**重新解析。
 5. 更新 **`kb_file_content.parse_status`** 与 **`kb_document`**（SUCCESS 时 bridge upsert，对齐 init SQL 下游消费）。
 6. 记录 **失败原因**（`error_code` / `error_message`）与 **重试关系**（`retry_of_result_id`）。
-7. 支持 **`--dry-run`** registry preview。
-8. 保持幂等；单 content 登记失败不中断批处理；**不写 curated / 向量 / 项目卡**。
+7. 支持 **`--dry-run`** registry preview（**零 DB 写入**）。
+8. **拒绝** 005 `dry_run=true` 的 parse report ingest（`INVALID_DRY_RUN_REPORT`）。
+9. 保持幂等；单 content 登记失败不中断批处理；**不写 curated / 向量 / 项目卡**。
 
 **006 核心能力**：将 005 磁盘解析产物与报告 **索引到 MySQL**，形成可查询的 parse lifecycle registry。
 
@@ -66,7 +68,7 @@ Phase 1 文件治理底座进度：
 | `ParseRegistryService` | report ingest、reconcile、查询、幂等 upsert |
 | CLI | `register-parse-report`、`list-parse-jobs`、`show-parse-job`、`list-parse-results`、`list-parsed-artifacts`、`reconcile-parsed-artifacts` |
 | `kb_file_content.parse_status` | UPDATE（来自最新 result 聚合规则，见 plan） |
-| `kb_document` | SUCCESS/EMPTY 时 upsert（bridge，见 plan §12） |
+| `kb_document` | SUCCESS/EMPTY 时 upsert（bridge）；**`document_uid = content_uid`** |
 | pytest + CLI E2E | 见 `test_cases.md` |
 
 **006 MVP 不包含、不得执行**：
@@ -104,7 +106,7 @@ Phase 1 文件治理底座进度：
 001 scan → 002 copy-to-vault → [003] → [004 route-parsers]
   → 005 parse-markitdown
     → parsed/ 三文件 + parse_markitdown_report_{UTC}.json
-  → 006 register-parse-report --report-path ...
+  → 006 register-parse-report --report-path ...（report.dry_run 必须为 false）
     → read report JSON + parse_manifest.json（只读 parsed/）
     → upsert kb_parse_run + kb_parse_result + kb_parsed_artifact
     → update kb_file_content.parse_status
@@ -145,10 +147,13 @@ Phase 1 文件治理底座进度：
 4. **不重新解析**：除非用户显式运行 005 `parse-markitdown`（不属于 006 默认路径）。
 5. **幂等**：同一 `report_path` 或同一 `(run_uid, content_uid, parser_adapter_version)` 重复 register 不产生 duplicate 主记录。
 6. **单条失败 continue**：单 content manifest 损坏 → `errors[]`；继续批处理。
-7. **dry-run**：不写 MySQL；输出 would_register 预览。
-8. **reconcile opt-in**：`reconcile-parsed-artifacts` 必须提供 `--sha256` / `--content-uid` / `--limit` 至少其一；**不得**默认全库。
-9. CLI 入口 `ensure_readonly()`。
-10. 若 Dev 发现必须修改 005 service → **STOP → TL**（不得倒灌）。
+7. **dry-run**：006 registry `--dry-run` **零 MySQL 写入**；仅 preview / registry report。
+8. **005 dry-run report**：`register-parse-report` 遇到 `report.dry_run=true` **必须拒绝**（`INVALID_DRY_RUN_REPORT`）。
+9. **reconcile opt-in**：`reconcile-parsed-artifacts` 必须提供 `--sha256` / `--content-uid` / `--limit` 至少其一；**不得**默认全库。
+10. **SKIPPED artifact**：无 manifest / parsed 三文件时 **不创建** `kb_parsed_artifact` 行（仅 `kb_parse_result`）。
+11. CLI 入口 `ensure_readonly()`。
+12. **`document_uid`**：upsert `kb_document` 时 **`document_uid = content_uid`**（禁止 sha256 备选）。
+13. 若 Dev 发现必须修改 005 service → **STOP → TL**（不得倒灌）。
 
 ---
 
@@ -161,9 +166,11 @@ Phase 1 文件治理底座进度：
 5. 006 **不**默认全库 reconcile。
 6. 006 **不** delete/move/overwrite raw_vault 或 parsed。
 7. 006 **必须**走 additive migration + DB Plan Review。
-8. 006 **必须**支持 dry-run。
-9. 006 **必须**记录 failure + retry 关系字段。
-10. 006 **不写** curated / 向量 / 项目卡。
+8. 006 **必须**支持 dry-run（零 DB 写）。
+9. 006 **必须**拒绝 005 dry-run report。
+10. 006 **必须**记录 failure + retry 关系字段。
+11. 006 **artifact UNIQUE** 含 `run_uid`（`uk_artifact_scope`）。
+12. 006 **不写** curated / 向量 / 项目卡。
 
 ---
 

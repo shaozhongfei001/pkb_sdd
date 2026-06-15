@@ -4,9 +4,9 @@
 > **项目路径**：`/home/szf/dev/pyws/pkb_sdd`  
 > **版本基线**：V1.1-SDD  
 > **编写日期**：2026-06-15  
-> **编写角色**：Tech Lead Agent — 步骤 ① Plan  
+> **编写角色**：Tech Lead Agent — P4 Plan Repair（步骤 ④）  
 > **当前分支**：`feature/006-parse-job-registry`  
-> **前置条件**：001–005 merge `main`；006 Preflight PASS
+> **前置条件**：001–005 merge `main`；P2 DB Plan Review PASS_WITH_NOTES；P3 Dev 只读方案完成
 
 ---
 
@@ -104,6 +104,24 @@ python -m app.cli.main register-parse-report --report-path reports/parse_markitd
 - 006 **`kb_parse_run`** = **batch run 审计记录**，对应用户故事中的「parse job」。
 - 006 MVP **不写** init `kb_parse_job`，避免语义混用；DB Review 须确认两表并存策略。
 
+### 5.1 `run_uid` 生成公式（P4 TL 裁决 S1）
+
+**公式（写死）**：
+
+```text
+run_uid = parse_run_{UTC:%Y%m%dT%H%M%SZ}_{short_uuid}
+```
+
+- `{UTC:%Y%m%dT%H%M%SZ}`：run 创建时刻 UTC，格式 `%Y%m%dT%H%M%SZ`（与 001/003/004/005 报告时间戳风格一致）。
+- `{short_uuid}`：`uuid4().hex[:8]`（8 位十六进制小写）。
+- **示例**：`parse_run_20260615T120000Z_a1b2c3d4`
+
+**约束**：
+
+- 全局唯一；不依赖自增 `id`。
+- 可读；作为 `kb_parse_run` 业务主键（`run_uid` UNIQUE）。
+- `register-parse-report` 幂等 upsert 时：若同一 `report_path` + `parser_adapter_version` 已存在 run，**复用已有 `run_uid`**，不重新生成。
+
 ---
 
 ## 6. Parse Job（Run）Lifecycle
@@ -117,14 +135,16 @@ python -m app.cli.main register-parse-report --report-path reports/parse_markitd
 | `COMPLETED` | 全部 items 处理完，无致命错误 | summary 写入完成 |
 | `PARTIAL` | 有 items 失败但 run 完成 | `failed_count > 0` 且非全局 abort |
 | `FAILED` | run 级失败（如 report 不可读） | 全局异常 |
-| `DRY_RUN_COMPLETED` | dry-run 预览完成 | `dry_run=true` |
+
+**禁止入库状态**：**不得**使用 `DRY_RUN_COMPLETED` 或任何 dry-run 终态写入 `kb_parse_run`。
 
 **转换**：
 
 ```text
 PENDING → RUNNING → COMPLETED | PARTIAL | FAILED
-dry_run: PENDING → DRY_RUN_COMPLETED（不写 result/artifact 表）
 ```
+
+**006 registry `--dry-run`**：**不**创建 `kb_parse_run` / `kb_parse_result` / `kb_parsed_artifact` 行；**不**更新 `kb_file_content.parse_status` / `kb_document`；仅输出 preview / `registry_report_{UTC}.json`。
 
 **时间戳**：`started_at` 在 RUNNING；`finished_at` 在终态。
 
@@ -162,16 +182,29 @@ dry_run: PENDING → DRY_RUN_COMPLETED（不写 result/artifact 表）
 |-----------------|----------|----------|
 | `PARSED_TEXT` | `parsed_text.md` | SUCCESS / EMPTY |
 | `PARSED_METADATA` | `parsed_metadata.json` | SUCCESS / EMPTY |
-| `PARSE_MANIFEST` | `parse_manifest.json` | 始终（含 FAILED） |
+| `PARSE_MANIFEST` | `parse_manifest.json` | SUCCESS / EMPTY / FAILED（磁盘 manifest 存在时） |
 | `PARSE_REPORT` | `parse_markitdown_report_*.json` | run 级一条（挂 run_uid） |
+
+**SKIPPED artifact 策略（P4 TL 裁决 S4）**：
+
+- `kb_parse_result.status=SKIPPED` 且 **无**磁盘 `parse_manifest.json` / `parsed_text.md` / `parsed_metadata.json` 时：**不创建**任何 `kb_parsed_artifact` 行；仅在 `kb_parse_result` 记录 SKIPPED。
+- MVP **不**引入 `artifact.status=SKIPPED`；skip manifest 场景留待后续 Spec。
 
 **索引字段**：
 
 - `artifact_path`：绝对或 config 相对路径（与 005 manifest 一致）
-- `artifact_hash`：文件 SHA256（存在则计算；缺失则 NULL + result FAILED）
+- `artifact_hash`：文件 SHA256（存在则计算；缺失则 NULL）
 - `artifact_size_bytes`：`stat().st_size`
 
-**唯一性**：`UNIQUE (content_uid, artifact_type, parser_name, parser_adapter_version)`（MVP）；report 级 artifact 用 `content_uid IS NULL` + `run_uid` 区分（见 §9）。
+**唯一性（P4 TL 裁决 M1 / Q16 — 方案 A）**：
+
+```text
+UNIQUE KEY uk_artifact_scope (run_uid, content_uid, artifact_type, parser_name, parser_adapter_version)
+```
+
+- **不得**使用旧草案 `uk_artifact_content_type(content_uid, artifact_type, ...)`。
+- 同一 content 在不同 parse run 下 **允许多条** artifact registry 记录；`run_uid` **必须**进入唯一键范围。
+- run 级 `PARSE_REPORT`：`content_uid` 使用空字符串 sentinel `''`（非 NULL），以满足 UNIQUE 语义。
 
 ---
 
@@ -181,19 +214,19 @@ dry_run: PENDING → DRY_RUN_COMPLETED（不写 result/artifact 表）
 
 ### 9.1 `kb_parse_run`（业务「Parse Job」）
 
-对应用户草案中的 batch-level `kb_parse_job` 字段；表名用 `kb_parse_run` 避免与 init `kb_parse_job` 冲突。
+业务文档所称 **「parse job」** 一律映射 **`kb_parse_run`**；**不得**将本表命名为或使用 init SQL 中的 `kb_parse_job`。
 
 ```sql
 CREATE TABLE IF NOT EXISTS kb_parse_run (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  run_uid VARCHAR(64) NOT NULL UNIQUE COMMENT '业务 job_uid；建议 sha256(report_path+generated_at) 或 UUID',
+  run_uid VARCHAR(64) NOT NULL UNIQUE COMMENT '见 §5.1：parse_run_{UTC}_{short_uuid}',
   parser_name VARCHAR(64) NOT NULL COMMENT '005: markitdown',
   parser_adapter_version VARCHAR(128) NOT NULL COMMENT '005: 005_mvp_v1',
   parser_family VARCHAR(64) NOT NULL DEFAULT 'MARKITDOWN_FAMILY',
   trigger_type VARCHAR(64) NOT NULL DEFAULT 'REGISTER_REPORT' COMMENT 'REGISTER_REPORT | RECONCILE',
   filters_json JSON COMMENT '来自 report.filters 或 CLI filter',
   status VARCHAR(64) NOT NULL DEFAULT 'PENDING',
-  dry_run TINYINT(1) NOT NULL DEFAULT 0,
+  dry_run TINYINT(1) NOT NULL DEFAULT 0 COMMENT '持久化 run 恒为 0；005 dry-run report 拒绝 ingest；006 CLI dry-run 不写行',
   total_candidates INT NOT NULL DEFAULT 0,
   in_scope_candidates INT NOT NULL DEFAULT 0,
   parsed_count INT NOT NULL DEFAULT 0,
@@ -260,8 +293,8 @@ CREATE TABLE IF NOT EXISTS kb_parse_result (
 CREATE TABLE IF NOT EXISTS kb_parsed_artifact (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   artifact_uid VARCHAR(64) NOT NULL UNIQUE,
-  run_uid VARCHAR(64) NULL COMMENT 'PARSE_REPORT 等 run 级 artifact',
-  content_uid VARCHAR(64) NULL,
+  run_uid VARCHAR(64) NOT NULL,
+  content_uid VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'run 级 PARSE_REPORT 用空字符串 sentinel',
   sha256 CHAR(64) NULL,
   artifact_type VARCHAR(64) NOT NULL,
   artifact_path TEXT NOT NULL,
@@ -273,7 +306,7 @@ CREATE TABLE IF NOT EXISTS kb_parsed_artifact (
   metadata JSON,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_artifact_content_type (content_uid, artifact_type, parser_name, parser_adapter_version),
+  UNIQUE KEY uk_artifact_scope (run_uid, content_uid, artifact_type, parser_name, parser_adapter_version),
   KEY idx_run_uid (run_uid),
   KEY idx_sha256 (sha256),
   KEY idx_artifact_type (artifact_type),
@@ -293,7 +326,7 @@ CREATE TABLE IF NOT EXISTS kb_parsed_artifact (
 
 | kb_document 列 | 来源 |
 |----------------|------|
-| `document_uid` | `sha256` 或 `f"{content_uid}:markitdown_default_v1"`（Dev 固定一种，QA 验证） |
+| `document_uid` | **`content_uid`**（P4 TL 裁决 M4 / Q19：与 001 一致；**禁止** sha256 或其它 hash 备选） |
 | `content_uid` / `source_sha256` | result |
 | `parser_name` / `parser_version` | manifest |
 | `parser_profile` | 固定 `markitdown_default_v1` |
@@ -353,10 +386,17 @@ class KbParsedArtifact(Base): ...
 
 ### 12.1 `parse_markitdown_report_*.json` → `kb_parse_run`
 
+**005 dry-run report 拒绝 ingest（P4 TL 裁决 M3 / Q18）**：
+
+- 若 `report.dry_run === true`：`register-parse-report` **必须 exit non-zero**。
+- 错误码：**`INVALID_DRY_RUN_REPORT`**。
+- **不得**将 005 dry-run report 登记进 registry（无 run/result/artifact 行）。
+
 | report 字段 | run 列 |
 |-------------|--------|
 | `parser_adapter_version` | `parser_adapter_version` |
-| `dry_run` | `dry_run` |
+| `dry_run=true` | **拒绝 ingest**（见上） |
+| `dry_run=false` | `dry_run=0`（持久化列恒 0） |
 | `filters` | `filters_json` |
 | `summary.total_candidates` | `total_candidates` |
 | `summary.in_scope_candidates` | `in_scope_candidates` |
@@ -386,7 +426,13 @@ class KbParsedArtifact(Base): ...
 
 ### 12.3 manifest → `kb_parsed_artifact`
 
-对每个 SUCCESS/EMPTY/FAILED content，索引 `PARSE_MANIFEST`；SUCCESS/EMPTY 额外索引 TEXT + METADATA。
+| result.status | artifact 行 |
+|---------------|---------------|
+| SUCCESS / EMPTY | `PARSE_MANIFEST` + `PARSED_TEXT` + `PARSED_METADATA`（文件存在时） |
+| FAILED | `PARSE_MANIFEST`（005 会写 FAILED manifest） |
+| SKIPPED | **无 manifest 时零 artifact 行**（§8 S4）；不在 MVP 写 skip artifact |
+
+run 级：每条 persist run 索引一条 `PARSE_REPORT`（`content_uid=''`）。
 
 ---
 
@@ -428,9 +474,10 @@ python -m app.cli.main register-parse-report \
 
 | 行为 | 说明 |
 |------|------|
-| 读 report JSON | 创建/upsert `kb_parse_run` |
-| 逐 item 读 manifest | upsert result + artifacts |
-| dry-run | 预览 would_register；不写 DB |
+| 读 report JSON | 若 `dry_run=true` → exit 1 + `INVALID_DRY_RUN_REPORT` |
+| 读 report JSON | 否则创建/upsert `kb_parse_run` |
+| 逐 item 读 manifest | upsert result + artifacts（SKIPPED 无 manifest 时仅 result） |
+| `--dry-run` | 预览 would_register；**零 DB 写**（不写三表、不写 parse_status、不写 kb_document） |
 | 幂等 | 同 `report_path` + version → upsert run，不 duplicate |
 
 ### 14.2 `list-parse-jobs`
@@ -488,9 +535,9 @@ python -m app.cli.main reconcile-parsed-artifacts \
 |------|------|
 | 重复 `register-parse-report` 同一 report | upsert 同一 `run_uid`；results upsert by `uk_parse_result_run_content` |
 | 同 content 新 run | 新 result 行；`parse_status` 取最新 |
-| artifact 已存在同 type | upsert path/hash/size |
-| dry-run | 零 INSERT |
-| reconcile 同 manifest | upsert，不 duplicate artifact |
+| artifact 同 run+scope | upsert by `uk_artifact_scope` |
+| 006 CLI `--dry-run` | **零** INSERT/UPDATE（三表 + parse_status + kb_document） |
+| reconcile 同 manifest | upsert by `uk_artifact_scope`；不 duplicate |
 
 ---
 
@@ -525,7 +572,7 @@ python -m app.cli.main reconcile-parsed-artifacts \
 | run 状态 | run 行在 batch 开始 INSERT；结束时 UPDATE summary + status |
 | 单条失败 | rollback 当前 content transaction；记录 `errors[]`；continue |
 | run 级失败 | rollback 整个 run（或 mark FAILED 并保留 partial — MVP 选 **mark FAILED**，已写入 results 保留） |
-| dry-run | 无 transaction |
+| 006 CLI `--dry-run` | 无 DB session / 无 transaction |
 
 ---
 
@@ -543,13 +590,14 @@ python -m app.cli.main reconcile-parsed-artifacts \
 
 | 错误 | code | 处理 |
 |------|------|------|
-| report 不存在/JSON 无效 | `INVALID_REPORT` | run FAILED；exit non-zero |
+| 005 dry-run report | `INVALID_DRY_RUN_REPORT` | exit non-zero；**零** registry 写入 |
+| report 不存在/JSON 无效 | `INVALID_REPORT` | exit non-zero；无 run 行（或 run FAILED 若已部分创建 — MVP 选 **无 run 行**） |
 | manifest 缺失 | `MISSING_MANIFEST` | result FAILED；continue |
 | manifest JSON 无效 | `INVALID_MANIFEST` | result FAILED；continue |
 | artifact 路径不存在 | `MISSING_ARTIFACT` | artifact status=`MISSING`；result 仍登记 |
 | content 不在 DB | `UNKNOWN_CONTENT` | errors[]；skip |
 | DB 失败 | `DB_ERROR` | rollback 当前条；continue |
-| dry-run | — | 无 write |
+| 006 CLI `--dry-run` | — | 无 write |
 
 ---
 
@@ -561,7 +609,10 @@ python -m app.cli.main reconcile-parsed-artifacts \
 |----|------|
 | migration | upgrade on clean DB；重复 idempotent |
 | register report | run + results + artifacts + document |
-| dry-run | 无 DB row |
+| 006 CLI `--dry-run` | 无 DB row |
+| 005 dry-run report reject | `INVALID_DRY_RUN_REPORT` |
+| SKIPPED no manifest | result only；零 artifact |
+| uk_artifact_scope | 同 run 重复 ingest 幂等 |
 | retry_of_result_id | 二次 register 失败→成功链 |
 | reconcile | opt-in limit；no re-parse |
 | 查询 CLI | list/show smoke |
@@ -586,7 +637,7 @@ pytest tests/test_markitdown_parser.py  # 005 不受影响
 
 ## 22. 验收标准
 
-见 `acceptance.md` A001–A015；对照 `test_cases.md`。
+见 `acceptance.md` A001–A019；对照 `test_cases.md`。
 
 ---
 
@@ -619,6 +670,24 @@ pytest tests/test_markitdown_parser.py  # 005 不受影响
 - `backend/app/services/parser_router.py`
 - `sql/001_init_schema_v1_1.sql`
 
+### 23.1 006 可写范围裁决（P4 TL）
+
+**允许写入**（migration + service 明确授权后）：
+
+- `kb_parse_run`
+- `kb_parse_result`
+- `kb_parsed_artifact`
+- `kb_file_content.parse_status`
+- `kb_document`
+
+**同时明确禁止**：
+
+- **不写** init SQL `kb_parse_job`
+- **不修改** `markitdown_parser.py`（005 封闭；衔接仅 `register-parse-report`）
+- **不执行**解析；**不改** raw_vault；**不改** parsed 磁盘产物
+- **不接** MinerU / OCR / PDF / IMAGE
+- **不做** curated / vector / project card
+
 ---
 
 ## 24. 禁止路径
@@ -650,7 +719,9 @@ specs/006-parse-job-registry/plan.md   # Dev 不改 Plan
 | migration additive | 仅 CREATE；无破坏性 ALTER |
 | 与 init SQL 共存 | `kb_parse_job` 不混用；`kb_document` bridge 字段对齐 |
 | 外键 | run_uid / retry_of 引用正确；删除策略 RESTRICT |
-| 幂等 UNIQUE | run/report、result/run+content、artifact/content+type |
+| 幂等 UNIQUE | run/report、result/run+content、**artifact/run+content+type（uk_artifact_scope）** |
+| dry-run 零写 | 006 CLI dry-run 与 005 dry-run report 拒绝 |
+| document_uid | 恒等于 `content_uid` |
 | parse_status 枚举 | 文档化；与 005 manifest 一致 |
 | parser_profile | 固定 `markitdown_default_v1` |
 | 事务 | 单 content 原子性 |
@@ -672,7 +743,8 @@ specs/006-parse-job-registry/plan.md   # Dev 不改 Plan
 
 - register 后 run/result/artifact 行存在  
 - kb_document + parse_status 正确  
-- dry-run 无 write  
+- 006 CLI dry-run 零 DB write；005 dry-run report 拒绝  
+- SKIPPED 无 manifest 无 artifact 行  
 - reconcile 需显式 filter  
 - 无 parsed/raw_vault 覆盖  
 - 无 MinerU  
@@ -729,14 +801,20 @@ specs/006-parse-job-registry/plan.md   # Dev 不改 Plan
 | **Q6** | 默认 reconcile | **禁止**；须显式 CLI + filter |
 | **Q7** | parsed 磁盘 | **只读** ingest |
 | **Q8** | migration | **additive** `006_parse_registry_v1.sql` |
-| **Q9** | dry-run | 不写 DB；run status `DRY_RUN_COMPLETED` 或不建 run |
+| **Q9** | 006 registry `--dry-run` | **零 DB 写**；禁止 `DRY_RUN_COMPLETED` 入库 |
 | **Q10** | retry | 只记录 `retry_of_result_id`；不自动 re-parse |
 | **Q11** | reconcile limit | **`PARSE_REGISTRY_MAX_LIMIT = 100`** |
-| **Q12** | document_uid | **`content_uid`**（与 001 一致） |
+| **Q12** | document_uid | **`document_uid = content_uid`**；禁止 sha256 备选 |
 | **Q13** | MinerU stub 编号 | 重编号 **008-mineru-parser**（文档，非 Dev） |
-| **Q14** | registry report | 可选 `registry_report_{UTC}.json` |
+| **Q14** | registry report | 可选 `registry_report_{UTC}.json`（dry-run 仍只写磁盘 report，不写 DB） |
 | **Q15** | HASH mismatch | warning in metadata；不 fail entire run |
+| **Q16** | artifact UNIQUE（M1） | **`uk_artifact_scope(run_uid, content_uid, artifact_type, parser_name, parser_adapter_version)`** |
+| **Q17** | registry dry-run（M2） | 不写 kb_parse_run/result/artifact/kb_document/parse_status |
+| **Q18** | 005 dry-run report（M3） | `report.dry_run=true` → exit 1 + **`INVALID_DRY_RUN_REPORT`** |
+| **Q19** | document_uid（M4） | **`document_uid = content_uid`**；删除 sha256 备选表述 |
+| **Q20** | run_uid（S1） | **`parse_run_{UTC:%Y%m%dT%H%M%SZ}_{uuid4.hex[:8]}`** |
+| **Q21** | SKIPPED artifact（S4） | 无 manifest/text/metadata 时 **零** artifact 行 |
 
 ---
 
-**Plan 结束** — STOP → **P2 DB Plan Review**（Implementation 门禁：DB PASS 后 Dev 方可 P5）。
+**Plan 结束** — P4 TL 裁决：**APPROVED_FOR_P5**（见 `tasks.md` T008b）。STOP → **P5 Dev Implementation**（须 DB Plan Re-Review 确认 M1–M4 schema 草案）。

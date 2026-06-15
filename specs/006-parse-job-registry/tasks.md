@@ -2,7 +2,7 @@
 
 > **Spec**：`specs/006-parse-job-registry`  
 > **分支**：`feature/006-parse-job-registry`  
-> **Plan**：`plan.md`（Tech Lead Plan 已落地）  
+> **Plan**：`plan.md`（P4 Plan Repair 已落地）  
 > **Dev 必读**：本文件 → `plan.md` → `spec.md` → `acceptance.md` → `test_cases.md`
 
 ---
@@ -12,16 +12,31 @@
 | 阶段 | 角色 | 说明 | 状态 |
 |------|------|------|------|
 | **P1** | TL | Plan 五件套 | [x] |
-| **P2** | DB | Plan Review | [ ] |
-| **P3** | Dev | 只读实现方案（不写代码） | [ ] |
-| **P4** | TL | Review & Approval | [ ] |
+| **P2** | DB | Plan Review | [x] PASS_WITH_NOTES |
+| **P3** | Dev | 只读实现方案（不写代码） | [x] |
+| **P4** | TL | Review & Approval + Plan Repair | [x] APPROVED_FOR_P5 |
 | **P5** | Dev | Implementation（白名单内） | [ ] |
 | **P6** | DB | Implementation Review | [ ] |
-| **P7** | QA | E2E 验收 A001–A015 | [ ] |
+| **P7** | QA | E2E 验收 A001–A019 | [ ] |
 | **P8** | HO | Handoff 文档 | [ ] |
 | **P9** | TL | Final Review / merge 决策 | [ ] |
 
-**门禁**：P2 未 PASS → 不得 P5；P6 未 PASS → 不得 P7；P7 未 PASS → 不得 P8/P9。
+**门禁**：P2 未 PASS → 不得 P5；P4 未 APPROVED_FOR_P5 → 不得 P5；P6 未 PASS → 不得 P7。
+
+---
+
+## P4 TL 裁决摘要（2026-06-15）
+
+| ID | 裁决 | Plan 引用 |
+|----|------|-----------|
+| **M1 / Q16** | artifact UNIQUE = `uk_artifact_scope(run_uid, content_uid, artifact_type, parser_name, parser_adapter_version)` | plan §8、§9.3 |
+| **M2 / Q17** | 006 registry `--dry-run` 零 DB 写；禁止 `DRY_RUN_COMPLETED` | plan §6、§14、Q17 |
+| **M3 / Q18** | `report.dry_run=true` → exit 1 + `INVALID_DRY_RUN_REPORT` | plan §12.1、§20、Q18 |
+| **M4 / Q19** | `document_uid = content_uid`；禁止 sha256 备选 | plan §9.5、Q19 |
+| **S1 / Q20** | `run_uid = parse_run_{UTC:%Y%m%dT%H%M%SZ}_{uuid4.hex[:8]}` | plan §5.1、Q20 |
+| **S4 / Q21** | SKIPPED 无 manifest 时零 artifact 行 | plan §8、§12.3、Q21 |
+
+**P4 结论**：**APPROVED_FOR_P5**（Plan Repair 完成；建议 DB 对 §9 schema 变更做 **Plan Re-Review** 确认 M1）。
 
 ---
 
@@ -87,33 +102,19 @@ specs/006-parse-job-registry/plan.md
 6. migration **additive only**；**不**改 init SQL。
 7. **不写** init SQL `kb_parse_job`（per-content queue 保留）。
 8. **不写** curated / 向量 / 项目卡 / Streamlit。
-9. 单条 ingest 失败 **continue**；dry-run **不写 DB**。
-10. **TL 实现决策**：Dev 必读 `plan.md` **附录 A**（Q1–Q15）。
+9. 单条 ingest 失败 **continue**；006 registry **`--dry-run` 零 DB 写**。
+10. **拒绝** 005 `dry_run=true` report（`INVALID_DRY_RUN_REPORT`）。
+11. **artifact UNIQUE** 使用 `uk_artifact_scope`（含 `run_uid`）。
+12. **`document_uid = content_uid`**；SKIPPED 无 manifest 时 **零** artifact 行。
+13. **TL 实现决策**：Dev 必读 `plan.md` **附录 A**（Q1–Q21）。
 
 ---
 
 ## P1 — TL Plan
 
-### T001 编写 spec.md
+### T001–T004
 
-- [x] 用户故事、目标、非目标、数据流
-- [x] 与 005 / init SQL 边界
-- [x] `kb_parse_run` 命名说明
-
-### T002 编写 plan.md（§1–§29 + 附录 A）
-
-- [x] 背景、schema 草案、ORM、CLI、幂等、reconcile、事务
-- [x] Dev 白名单、DB/QA 关注点、STOP 条件
-
-### T003 编写 tasks.md / acceptance.md / test_cases.md
-
-- [x] 流水线九阶段
-- [x] A001–A015 验收项
-- [x] test cases 全覆盖
-
-### T004 Plan 完成 STOP
-
-- [x] STOP → **P2 DB Plan Review**
+- [x] 五件套完成 → P2
 
 ---
 
@@ -121,56 +122,42 @@ specs/006-parse-job-registry/plan.md
 
 ### T005 DB Agent 审查 Plan（只读）
 
-- [ ] 已读 `plan.md` §9–§11、§25
-- [ ] 确认 migration additive；无破坏性 ALTER 001–005 表
-- [ ] 确认 `kb_parse_run` vs init `kb_parse_job` 共存策略
-- [ ] 确认 UNIQUE / FK / parse_status 枚举 / kb_document bridge
-- [ ] 确认 reconcile opt-in 与事务策略可审查
-- [ ] 输出结论：**PASS** / **PASS_WITH_NOTES** / **BLOCKED**
-
-**BLOCKED** → STOP → TL 修补 Plan  
-**PASS** → STOP → P3 Dev 只读方案
+- [x] migration additive；`kb_parse_run` vs init `kb_parse_job` 共存
+- [x] 结论：**PASS_WITH_NOTES**（M1 artifact UNIQUE 待 P4 修复 → 已在 P4 落地）
 
 ---
 
-## P3 — Dev Agent 只读实现方案
+## P3 — Dev 只读实现方案
 
-### T006 Dev 阅读与方案输出（不写代码）
+### T006–T007
 
-- [ ] 已读 `tasks.md`、`plan.md` 附录 A、`spec.md`
-- [ ] 已读 005 manifest/report 结构、`parsed_paths.py`
-- [ ] 已读 init SQL `kb_document`、`kb_file_content.parse_status`
-- [ ] 输出：类/方法清单、migration 执行方式、测试策略、风险项
-- [ ] 书面确认：不修改 `markitdown_parser.py`
-
-### T007 Dev 确认 DB 边界
-
-- [ ] 书面确认：006 写 `kb_parse_run/result/artifact` + parse_status + kb_document
-- [ ] 书面确认：006 **不写** init `kb_parse_job`
-
-**完成后 STOP → P4 TL 批准**
+- [x] Dev 只读方案完成
+- [x] 确认：006 不写 init `kb_parse_job`；不改 `markitdown_parser.py`
 
 ---
 
-## P4 — TL Review & Approval
+## P4 — TL Review & Approval + Plan Repair
 
-### T008 P4 TL 裁决（DB Review 后填写）
+### T008 P4 TL 裁决
 
-| # | 裁决 | 说明 |
+| # | 裁决 | 状态 |
 |---|------|------|
-| R1 | 表名 | `kb_parse_run` / `kb_parse_result` / `kb_parsed_artifact` |
-| R2 | migration 文件 | `006_parse_registry_v1.sql` |
-| R3 | 005 衔接 | `register-parse-report` only |
-| R4 | parser_profile | `markitdown_default_v1` |
-| R5 | reconcile | opt-in + limit ≤ 100 |
+| R1 | 表名：`kb_parse_run` / `kb_parse_result` / `kb_parsed_artifact` | [x] |
+| R2 | migration：`006_parse_registry_v1.sql` | [x] |
+| R3 | 005 衔接：`register-parse-report` only | [x] |
+| R4 | M1 `uk_artifact_scope` | [x] |
+| R5 | M2 dry-run 零 DB 写 | [x] |
+| R6 | M3 拒绝 005 dry-run report | [x] |
+| R7 | M4 `document_uid = content_uid` | [x] |
+| R8 | S1 run_uid 公式 | [x] |
+| R9 | S4 SKIPPED 零 artifact | [x] |
 
 ### T008b TL 书面批准 Dev Implementation
 
-- [ ] DB Plan Review = **PASS** 或 **PASS_WITH_NOTES**（无阻断）
-- [ ] Dev 只读方案已审
-- [ ] **结论：APPROVED_FOR_P5** 或 **NEEDS_PLAN_REPAIR**
+- [x] P2 PASS_WITH_NOTES；P3 完成；Plan Repair M1–M4/S1/S4 已写入 plan.md
+- [x] **结论：APPROVED_FOR_P5**
 
-**STOP → P5 Dev**
+**STOP → P5 Dev**（建议 DB 对 §9 `uk_artifact_scope` 做 **Plan Re-Review** 后 Dev 开工）
 
 ---
 
@@ -178,108 +165,52 @@ specs/006-parse-job-registry/plan.md
 
 ### T009 编写 migration
 
-- [ ] 新增 `sql/migrations/006_parse_registry_v1.sql`
-- [ ] CREATE TABLE 三表；IF NOT EXISTS
-- [ ] 可选 down migration（测试）
+- [ ] `006_parse_registry_v1.sql` 含 `uk_artifact_scope`（§9.3）
+- [ ] `run_uid` 列 VARCHAR(64)；artifact `run_uid NOT NULL`
 
 ### T010 实现 ORM models
 
-- [ ] `parse_registry.py`：KbParseRun、KbParseResult、KbParsedArtifact
-- [ ] `document.py`：KbDocument（若需要）
-- [ ] 字段与 migration 一致
+- [ ] 与 migration 一致；含 `uk_artifact_scope` 映射
 
 ### T011 实现 ParseRegistryService
 
-- [ ] `register_from_report()`：读 report + manifest → upsert
-- [ ] `reconcile_parsed_artifacts()`：opt-in scan
-- [ ] 查询 helpers：list/show jobs、results、artifacts
-- [ ] retry_of_result_id 逻辑
-- [ ] kb_document bridge + parse_status UPDATE
-- [ ] dry-run 路径
-- [ ] 单条失败 continue
+- [ ] `register_from_report()`：拒绝 `dry_run=true` report
+- [ ] 006 `--dry-run`：零 DB 写
+- [ ] `document_uid = content_uid`
+- [ ] SKIPPED 无 manifest：仅 result，零 artifact
+- [ ] `run_uid` 按 §5.1 生成
 
 ### T012 实现 CLI
 
-- [ ] `register-parse-report`
-- [ ] `list-parse-jobs`、`show-parse-job`
-- [ ] `list-parse-results`、`list-parsed-artifacts`
-- [ ] `reconcile-parsed-artifacts`（filter 护栏）
-- [ ] `ensure_readonly()` 入口
+- [ ] 全部 006 命令 + 护栏
 
 ### T013 实现 pytest
 
-- [ ] `test_parse_registry.py`（≥25 functions）
-- [ ] 覆盖 `test_cases.md` 全部 TC
-- [ ] migration upgrade + idempotency
-- [ ] 005 回归：`test_markitdown_parser.py` pass
+- [ ] 覆盖 M1–M4 / S4 test cases（TC015–TC019 等）
 
 ### T014 Dev 自检 STOP
 
-- [ ] 改动文件均在白名单内
-- [ ] 未改 `markitdown_parser.py`
-- [ ] `tasks.md` P5 项勾选
-- [ ] 输出：文件清单、migrate/pytest/CLI 命令
-- [ ] STOP → **P6 DB Implementation Review**
+- [ ] STOP → P6
 
 ---
 
-## P6 — DB & Data Implementation Review
+## P6 — P9
 
-### T015 DB Agent 审查 Dev diff
-
-- [ ] migration 与 ORM 一致
-- [ ] 幂等 UNIQUE 正确
-- [ ] 无写 init `kb_parse_job`
-- [ ] parse_status / kb_document bridge 正确
-- [ ] 结论：**PASS** / **PASS_WITH_NOTES** / **BLOCKED**
-
----
-
-## P7 — E2E QA
-
-### T016 QA 执行验收
-
-- [ ] 对照 `test_cases.md` 与 `acceptance.md` A001–A015
-- [ ] 必查四项 + 006 专项
-- [ ] 输出验收表 + 证据
-- [ ] STOP → P8 Handoff
-
----
-
-## P8 — Handoff
-
-### T017 HO 撰写交接文档
-
-- [ ] `docs/handoff-phase1-006-parse-job-registry.md`
-- [ ] 含 migrate 命令、CLI 用法、A001–A015
-
----
-
-## P9 — TL Final Review
-
-### T018 TL Final Review
-
-- [ ] 范围符合 Plan / Spec
-- [ ] DB/QA 均 PASS
-- [ ] 005 未回退
-- [ ] 可 merge main / 008 入口条件
+（与 Plan 一致；验收 A001–A019）
 
 ---
 
 ## 任务进度总览
 
-| Task | 阶段 | 说明 | 状态 |
-|------|------|------|------|
-| T001–T004 | P1 | TL Plan | [x] |
-| T005 | P2 | DB Plan Review | [ ] |
-| T006–T007 | P3 | Dev 只读方案 | [ ] |
-| T008 | P4 | TL Approval | [ ] |
-| T009–T014 | P5 | Dev Implementation | [ ] |
-| T015 | P6 | DB Implementation Review | [ ] |
-| T016 | P7 | E2E QA | [ ] |
-| T017 | P8 | Handoff | [ ] |
-| T018 | P9 | TL Final Review | [ ] |
+| Task | 阶段 | 状态 |
+|------|------|------|
+| T001–T004 | P1 | [x] |
+| T005 | P2 | [x] PASS_WITH_NOTES |
+| T006–T007 | P3 | [x] |
+| T008–T008b | P4 | [x] APPROVED_FOR_P5 |
+| T009–T014 | P5 | [ ] |
+| T015–T018 | P6–P9 | [ ] |
 
 ---
 
-**Tasks 结束** — 当前 STOP 点：**P2 DB Plan Review**。
+**Tasks 结束** — 当前 STOP 点：**P5 Dev Implementation**（TL 已授权；建议 DB Plan Re-Review §9）。
