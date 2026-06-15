@@ -13,7 +13,7 @@
 
 ```text
 backend/app/services/duplicate_governance.py          # 新增
-backend/app/models/duplicate.py                       # 新增（或扩 models/file.py）
+backend/app/models/duplicate.py                       # 新增（KbDuplicateGroup；不扩 file.py，见 plan §23 Q1）
 backend/app/cli/main.py                               # 新增 govern-duplicates
 backend/tests/test_duplicate_governance.py            # 新增
 specs/003-duplicate-governance/tasks.md               # 勾选
@@ -48,6 +48,8 @@ specs/其他编号/**
 9. 精确重复 **仅** sha256 完全一致（见 `plan.md` §7）；不用 LLM。
 10. cleanup suggestion **只生成建议**，不执行删除 / 移动 / 重命名 / quarantine（见 `plan.md` §10）。
 
+11. **TL 实现决策**：实现前必读 `plan.md` **§23**（Q1–Q7：duplicate.py、无 dry-run、DISCOVERED 过滤、skipped 计数、测试 helper 清理、单实例 sha256 不建组）。
+
 ---
 
 ## T001 阅读 001/002 相关模型、服务、CLI 与测试
@@ -68,12 +70,12 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 已读 `backend/app/models/file.py`、`vault.py`
-- [ ] 已读 `inventory_scanner.py`、`file_content_vault.py`（只读，不改）
-- [ ] 已读 `cli/main.py` 中 `scan`、`copy-to-vault`
-- [ ] 已读 `test_inventory_scanner.py`、`test_file_content_vault.py`
-- [ ] 已读 `tests/fixtures/中文路径/银行项目/` 重复样本
-- [ ] 已读 `plan.md` 全文
+- [x] 已读 `backend/app/models/file.py`、`vault.py`
+- [x] 已读 `inventory_scanner.py`、`file_content_vault.py`（只读，不改）
+- [x] 已读 `cli/main.py` 中 `scan`、`copy-to-vault`
+- [x] 已读 `test_inventory_scanner.py`、`test_file_content_vault.py`
+- [x] 已读 `tests/fixtures/中文路径/银行项目/` 重复样本
+- [x] 已读 `plan.md` 全文
 
 ---
 
@@ -95,9 +97,9 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 已对照 `sql/001_init_schema_v1_1.sql` 中 `kb_duplicate_group` 全部字段
-- [ ] `KbDuplicateGroup` ORM 计划字段与 SQL 一致，无发明字段
-- [ ] 书面确认：003 MVP 无 schema 变更
+- [x] 已对照 `sql/001_init_schema_v1_1.sql` 中 `kb_duplicate_group` 全部字段
+- [x] `KbDuplicateGroup` ORM 计划字段与 SQL 一致，无发明字段
+- [x] 书面确认：003 MVP 无 schema 变更
 
 ---
 
@@ -110,7 +112,7 @@ specs/其他编号/**
 ### 允许修改范围
 
 - `backend/app/services/duplicate_governance.py`（新增）
-- `backend/app/models/duplicate.py` 或 `models/file.py`（`KbDuplicateGroup`）
+- `backend/app/models/duplicate.py`（`KbDuplicateGroup`；**不**扩 `models/file.py`）
 - `specs/003-duplicate-governance/tasks.md`（勾选）
 
 ### 禁止事项
@@ -119,13 +121,14 @@ specs/其他编号/**
 - 不改 SQL schema
 - 不引入新依赖
 - 不 touch 原始文件 / raw_vault 磁盘
+- **不实现** `--dry-run`（plan §23 Q2）
 
 ### 验收标准
 
-- [ ] Service 可实例化并连接 MySQL
-- [ ] 返回 `DuplicateGovernResult` 汇总结构
-- [ ] 调用 `ensure_readonly()` 由 CLI 或 service 入口保证
-- [ ] 单组失败记入 `errors`，不中断批处理
+- [x] Service 可实例化并连接 MySQL
+- [x] 返回 `DuplicateGovernanceResult` 汇总结构
+- [x] 调用 `ensure_readonly()` 由 CLI 或 service 入口保证
+- [x] 单组失败记入 `errors`，不中断批处理
 
 ---
 
@@ -138,20 +141,21 @@ specs/其他编号/**
 ### 允许修改范围
 
 - `backend/app/services/duplicate_governance.py`
-- `backend/app/models/duplicate.py`（或 `file.py`）
+- `backend/app/models/duplicate.py`（**不**扩 `file.py`）
 
 ### 禁止事项
 
 - 不做非 sha256 重复识别
 - 不写 `kb_version_candidate_group`
-- 不修改 `kb_file_content` 行（除只读）
+- 不修改 `kb_file_content` 行（含 **不** 改 `master_file_instance_uid`）
+- MVP 仅加载 `status == "DISCOVERED"` 的 instance（plan §23 Q4）
 
 ### 验收标准
 
-- [ ] `duplicate_group_uid = sha256`
-- [ ] `instance_count >= 2` 才建组；`= 1` 跳过
-- [ ] 组内全部 instance 写入相同 `duplicate_group_uid`
-- [ ] upsert 幂等（重复运行无重复 INSERT）
+- [x] `duplicate_group_uid = sha256`
+- [x] `instance_count >= 2` 才建组；`= 1` 跳过
+- [x] 组内全部 instance 写入相同 `duplicate_group_uid`
+- [x] upsert 幂等（重复运行无重复 INSERT）
 
 ---
 
@@ -169,13 +173,14 @@ specs/其他编号/**
 
 - 不用 LLM
 - **不修改** `kb_file_content.master_file_instance_uid`（002 vault 源保持不变）
+- 与 content master 不一致时，仅在报告 / suggestion `reason` 说明（plan §23 Q3）
 
 ### 验收标准
 
-- [ ] 优先级：非 duplicate → 短路径 → 非 copy-like 文件名 → modified_time → created_at → uid
-- [ ] fixtures：`方案.txt` 为 master，`方案副本.txt` 为 duplicate suggestion 对象
-- [ ] 同输入多次运行 master uid 一致
-- [ ] copy-like 标记含：`副本`、`copy`、`bak`、`tmp`、`临时` 等（见 Plan）
+- [x] 优先级：非 duplicate → 短路径 → 非 copy-like 文件名 → modified_time → created_at → uid
+- [x] fixtures：`方案.txt` 为 master，`方案副本.txt` 为 duplicate suggestion 对象
+- [x] 同输入多次运行 master uid 一致
+- [x] copy-like 标记含：`副本`、`copy`、`bak`、`tmp`、`临时` 等（见 Plan）
 
 ---
 
@@ -197,9 +202,9 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 每条 suggestion 含 group uid、master uid/path、duplicate uid/path
-- [ ] `decision=PENDING`，`auto_execute=false`
-- [ ] 可追溯到 vault_path（只读，可为 null）
+- [x] 每条 suggestion 含 group uid、master uid/path、duplicate uid/path
+- [x] `decision=PENDING`，`auto_execute=false`
+- [x] 可追溯到 vault_path（只读，可为 null）
 
 ---
 
@@ -220,10 +225,10 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 两份 JSON 结构符合 `plan.md` §11
-- [ ] `cleanup_suggestion_report` 顶层 `auto_execute: false`
-- [ ] 报告路径写入 `DuplicateGovernResult`
-- [ ] `reports_root` 自动 `mkdir`
+- [x] 两份 JSON 结构符合 `plan.md` §11
+- [x] `cleanup_suggestion_report` 顶层 `auto_execute: false`
+- [x] 报告路径写入 `DuplicateGovernanceResult`
+- [x] `reports_root` 自动 `mkdir`
 
 ---
 
@@ -241,12 +246,14 @@ specs/其他编号/**
 
 - 不删除或破坏现有 `scan`、`copy-to-vault`
 - 不实现 parse 链
+- **不实现** `--dry-run`（plan §23 Q2）
 
 ### 验收标准
 
-- [ ] `python -m app.cli.main govern-duplicates` 可运行
-- [ ] Rich 输出 Plan §5.3 汇总字段
-- [ ] 可选过滤参数生效
+- [x] `python -m app.cli.main govern-duplicates` 可运行
+- [x] Rich 输出 Plan §5.3 汇总字段
+- [x] 可选过滤参数生效
+- [x] `--sha256` 指向单实例：skipped/空结果，exit 0（plan §23 Q7）
 
 ---
 
@@ -267,9 +274,9 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] ≥ 7 个 test functions（见 Plan §19.1）
-- [ ] `pytest -q tests/test_duplicate_governance.py` 全部通过
-- [ ] 含 master 非 copy-like 文件名断言
+- [x] ≥ 7 个 test functions（见 Plan §19.1）
+- [x] `pytest -q tests/test_duplicate_governance.py` 全部通过
+- [x] 含 master 非 copy-like 文件名断言
 
 ---
 
@@ -290,9 +297,9 @@ pytest 或文档化步骤验证 scan → copy-to-vault → govern-duplicates 全
 
 ### 验收标准
 
-- [ ] `test_govern_project_fixtures_integration`（或等价）通过
-- [ ] CLI E2E 输出 Groups processed ≥ 1、Errors = 0
-- [ ] 报告文件在 tmp reports_root 中存在
+- [x] `test_govern_project_fixtures_integration`（或等价）通过
+- [x] CLI E2E 输出 Groups processed ≥ 1、Errors = 0
+- [x] 报告文件在 tmp reports_root 中存在
 
 ---
 
@@ -308,12 +315,13 @@ pytest 或文档化步骤验证 scan → copy-to-vault → govern-duplicates 全
 
 ### 禁止事项
 
-- 测试中不得 delete/rename fixture 源文件
+- 不 delete/rename fixture 源文件
+- 业务 service 不得 DELETE 数据；**仅** pytest helper / teardown 可清理测试行（plan §23 Q6）
 
 ### 验收标准
 
-- [ ] `test_original_files_unchanged` 通过
-- [ ] 与 001/002 测试断言风格一致
+- [x] `test_original_files_unchanged` 通过
+- [x] 与 001/002 测试断言风格一致
 
 ---
 
@@ -333,8 +341,8 @@ govern 前后 `original.bin` 及 vault 目录 listing 不变。
 
 ### 验收标准
 
-- [ ] `test_raw_vault_unchanged` 通过
-- [ ] bin sha256 与 govern 前一致
+- [x] `test_raw_vault_unchanged` 通过
+- [x] bin sha256 与 govern 前一致
 
 ---
 
@@ -351,12 +359,13 @@ govern 前后 `original.bin` 及 vault 目录 listing 不变。
 ### 禁止事项
 
 - 不通过 DELETE 数据「伪造」幂等
+- group 无字段变化应计 `skipped`（plan §23 Q5）
 
 ### 验收标准
 
-- [ ] `test_govern_idempotent` 通过
-- [ ] `kb_duplicate_group` 行数稳定
-- [ ] `duplicate_group_uid` 与 master uid 两次一致
+- [x] `test_govern_idempotent` 通过
+- [x] `kb_duplicate_group` 行数稳定
+- [x] `duplicate_group_uid` 与 master uid 两次一致
 
 ---
 
@@ -389,19 +398,19 @@ Dev 完成后 STOP；由 **QA** 执行 A001–A006，**Handoff** 写交接文档
 
 | Task | 说明 | 状态 |
 |------|------|------|
-| T001 | 阅读 001/002 | [ ] |
-| T002 | 确认无 schema 变更 | [ ] |
-| T003 | governance service | [ ] |
-| T004 | duplicate group 识别 | [ ] |
-| T005 | master candidate | [ ] |
-| T006 | cleanup suggestion | [ ] |
-| T007 | report 输出 | [ ] |
-| T008 | CLI | [ ] |
-| T009 | pytest 单元 | [ ] |
-| T010 | CLI E2E 测试 | [ ] |
-| T011 | 原始文件保护 | [ ] |
-| T012 | raw_vault 保护 | [ ] |
-| T013 | 幂等 | [ ] |
+| T001 | 阅读 001/002 | [x] |
+| T002 | 确认无 schema 变更 | [x] |
+| T003 | governance service | [x] |
+| T004 | duplicate group 识别 | [x] |
+| T005 | master candidate | [x] |
+| T006 | cleanup suggestion | [x] |
+| T007 | report 输出 | [x] |
+| T008 | CLI | [x] |
+| T009 | pytest 单元 | [x] |
+| T010 | CLI E2E 测试 | [x] |
+| T011 | 原始文件保护 | [x] |
+| T012 | raw_vault 保护 | [x] |
+| T013 | 幂等 | [x] |
 | T014 | 验收交接（STOP→DB/QA/HO） | [ ] |
 
 ---
