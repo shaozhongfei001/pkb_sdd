@@ -84,13 +84,13 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 已读 `docs/handoff-phase1-003-duplicate-governance.md`
-- [ ] 已读 `backend/app/models/file.py`、`vault.py`、`duplicate.py`
-- [ ] 已读 `inventory_scanner.py`、`file_content_vault.py`、`duplicate_governance.py`（只读，不改）
-- [ ] 已读 `cli/main.py` 中 `scan`、`copy-to-vault`、`govern-duplicates`
-- [ ] 已读 `test_inventory_scanner.py`、`test_file_content_vault.py`、`test_duplicate_governance.py`
-- [ ] 已读 `tests/fixtures/中文路径/银行项目/`
-- [ ] 已读 `plan.md` 全文
+- [x] 已读 `docs/handoff-phase1-003-duplicate-governance.md`
+- [x] 已读 `backend/app/models/file.py`、`vault.py`、`duplicate.py`
+- [x] 已读 `inventory_scanner.py`、`file_content_vault.py`、`duplicate_governance.py`（只读，不改）
+- [x] 已读 `cli/main.py` 中 `scan`、`copy-to-vault`、`govern-duplicates`
+- [x] 已读 `test_inventory_scanner.py`、`test_file_content_vault.py`、`test_duplicate_governance.py`
+- [x] 已读 `tests/fixtures/中文路径/银行项目/`
+- [x] 已读 `plan.md` 全文
 
 ---
 
@@ -112,10 +112,10 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 已对照 `plan.md` §3、§7、§19
-- [ ] 已确认 `build-parse-queue`、`parse` 保持 placeholder（plan §5.3）
-- [ ] 已确认 Parser Router 输出为 route decision + `future_parser_hint`，不是 parsed content
-- [ ] 已确认 `future_parser_hint` 仅为后续 005/006 提示；004 不 import/调用/subprocess/网络访问任何解析器（plan §6.5）
+- [x] 已对照 `plan.md` §3、§7、§19
+- [x] 已确认 `build-parse-queue`、`parse` 保持 placeholder（plan §5.3）
+- [x] 已确认 Parser Router 输出为 route decision + `future_parser_hint`，不是 parsed content
+- [x] 已确认 `future_parser_hint` 仅为后续 005/006 提示；004 不 import/调用/subprocess/网络访问任何解析器（plan §6.5）
 
 ---
 
@@ -138,9 +138,9 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 已对照 `plan.md` §14 全文
-- [ ] 书面确认：004 MVP 无 schema 变更、无 DB 写
-- [ ] 已确认仅输出 `parser_route_report_{UTC}.json`
+- [x] 已对照 `plan.md` §14 全文
+- [x] 书面确认：004 MVP 无 schema 变更、无 DB 写
+- [x] 已确认仅输出 `parser_route_report_{UTC}.json`
 
 ---
 
@@ -163,11 +163,11 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] `RouteType` 含：DOCX、PPTX、XLSX、PDF_DIGITAL、PDF_SCANNED_OR_IMAGE、IMAGE、TEXT_OR_MARKDOWN、UNKNOWN、UNSUPPORTED
-- [ ] `future_parser_hint` 仅取：`MARKITDOWN_FAMILY` | `MINERU_FAMILY` | `DIRECT_TEXT` | `NONE`（plan §6.4–§6.5）
-- [ ] 规则表与 `plan.md` §9.2 一致；hint 映射与 §6.4 一致
-- [ ] 同 ext/mime 输入 → 稳定输出（单元可测）
-- [ ] `ext_from_path` / fallback 逻辑可测
+- [x] `RouteType` 含：DOCX、PPTX、XLSX、PDF_DIGITAL、PDF_SCANNED_OR_IMAGE、IMAGE、TEXT_OR_MARKDOWN、UNKNOWN、UNSUPPORTED
+- [x] `future_parser_hint` 仅取：`MARKITDOWN_FAMILY` | `MINERU_FAMILY` | `DIRECT_TEXT` | `NONE`（plan §6.4–§6.5）
+- [x] 规则表与 `plan.md` §9.2 一致；hint 映射与 §6.4 一致
+- [x] 同 ext/mime 输入 → 稳定输出（单元可测）
+- [x] `ext_from_path` / fallback 逻辑可测
 
 ---
 
@@ -191,11 +191,11 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] Service 可实例化并连接 MySQL
-- [ ] 候选条件：`vault_status=COPIED`、`status=CONTENT_REGISTERED`、`sha256 IS NOT NULL`
-- [ ] 返回 `ParserRouteResult` 汇总结构
-- [ ] 调用 `ensure_readonly()` 由 CLI 或 service 入口保证
-- [ ] 单 content 失败记入 `errors`，不中断批处理
+- [x] Service 可实例化并连接 MySQL
+- [x] 候选条件：`vault_status=COPIED`、`status=CONTENT_REGISTERED`、`sha256 IS NOT NULL`
+- [x] 返回 `ParserRouteResult` 汇总结构
+- [x] 调用 `ensure_readonly()` 由 CLI 或 service 入口保证
+- [x] 单 content 失败记入 `errors`，不中断批处理
 
 ---
 
@@ -217,11 +217,11 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] JSON 含 `report_type`、`summary`、`decisions[]`、`errors[]`
-- [ ] 每条 decision 含 content_uid、sha256、vault_path、file_ext、route_type、decision、reason、`future_parser_hint`（§6.5 四值之一）
-- [ ] 报告字段名使用 `future_parser_hint`，**不得**使用 `suggested_parser`
-- [ ] UTC 文件名格式与 001/003 对齐
-- [ ] `routing_rules_version` 或等价 metadata 可追踪（可选常量）
+- [x] JSON 含 `report_type`、`summary`、`decisions[]`、`errors[]`
+- [x] 每条 decision 含 content_uid、sha256、vault_path、file_ext、route_type、decision、reason、`future_parser_hint`（§6.5 四值之一）
+- [x] 报告字段名使用 `future_parser_hint`，**不得**使用 `suggested_parser`
+- [x] UTC 文件名格式与 001/003 对齐
+- [x] `routing_rules_version` 或等价 metadata 可追踪（可选常量）
 
 ---
 
@@ -243,10 +243,10 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] `python -m app.cli.main route-parsers` 可运行
-- [ ] Rich 输出 Candidates / Routed / Errors 等（plan §5.2）
-- [ ] 打印 `Parser route report:` 路径
-- [ ] `ensure_readonly()` 在入口调用
+- [x] `python -m app.cli.main route-parsers` 可运行
+- [x] Rich 输出 Candidates / Routed / Errors 等（plan §5.2）
+- [x] 打印 `Parser route report:` 路径
+- [x] `ensure_readonly()` 在入口调用
 
 ---
 
@@ -268,10 +268,10 @@ specs/其他编号/**
 
 ### 验收标准
 
-- [ ] 覆盖 `plan.md` §20.1 所列用例（≥10 functions）
-- [ ] `.txt` fixture → `TEXT_OR_MARKDOWN`，`future_parser_hint=DIRECT_TEXT`
-- [ ] `.doc` → `UNSUPPORTED`；缺 ext → `UNKNOWN`
-- [ ] `pytest -q tests/test_parser_router.py` 通过
+- [x] 覆盖 `plan.md` §20.1 所列用例（≥10 functions）
+- [x] `.txt` fixture → `TEXT_OR_MARKDOWN`，`future_parser_hint=DIRECT_TEXT`
+- [x] `.doc` → `UNSUPPORTED`；缺 ext → `UNKNOWN`
+- [x] `pytest -q tests/test_parser_router.py` 通过
 
 ---
 
@@ -292,9 +292,9 @@ pytest 集成用例验证 scan → copy-to-vault → route-parsers 全链路。
 
 ### 验收标准
 
-- [ ] `test_route_project_fixtures_integration`（或等价）通过
-- [ ] CLI E2E：Routed ≥ 1、Errors = 0
-- [ ] `parser_route_report_*.json` 存在于测试 reports_root
+- [x] `test_route_project_fixtures_integration`（或等价）通过
+- [x] CLI E2E：Routed ≥ 1、Errors = 0
+- [x] `parser_route_report_*.json` 存在于测试 reports_root
 
 ---
 
@@ -315,8 +315,8 @@ pytest 集成用例验证 scan → copy-to-vault → route-parsers 全链路。
 
 ### 验收标准
 
-- [ ] `test_original_files_unchanged` 通过
-- [ ] 与 001/002/003 测试断言风格一致
+- [x] `test_original_files_unchanged` 通过
+- [x] 与 001/002/003 测试断言风格一致
 
 ---
 
@@ -337,8 +337,8 @@ route 前后 `original.bin` 及 vault 目录 listing 不变；service 不读 bin
 
 ### 验收标准
 
-- [ ] `test_raw_vault_unchanged` 通过
-- [ ] bin sha256 与 route 前一致
+- [x] `test_raw_vault_unchanged` 通过
+- [x] bin sha256 与 route 前一致
 
 ---
 
@@ -354,9 +354,9 @@ route 前后 `original.bin` 及 vault 目录 listing 不变；service 不读 bin
 
 ### 验收标准
 
-- [ ] `test_route_idempotent` 通过
-- [ ] 两次 decisions 中 route_type、rule_name、reason 一致
-- [ ] 无 MySQL 写操作（无重复主记录）
+- [x] `test_route_idempotent` 通过
+- [x] 两次 decisions 中 route_type、rule_name、reason 一致
+- [x] 无 MySQL 写操作（无重复主记录）
 
 ---
 
@@ -395,18 +395,18 @@ docs/handoff-phase1-004-parser-router.md
 
 | Task | 说明 | 状态 |
 |------|------|------|
-| T001 | 阅读 001/002/003 | [ ] |
-| T002 | 确认不解析/不接 parser | [ ] |
-| T003 | 确认 schema 策略 | [ ] |
-| T004 | route_type + routing rule | [ ] |
-| T005 | Parser Router service | [ ] |
-| T006 | parser_route_report | [ ] |
-| T007 | CLI route-parsers | [ ] |
-| T008 | pytest 单元 | [ ] |
-| T009 | CLI E2E | [ ] |
-| T010 | 原始文件保护 | [ ] |
-| T011 | raw_vault 保护 | [ ] |
-| T012 | 幂等性 | [ ] |
+| T001 | 阅读 001/002/003 | [x] |
+| T002 | 确认不解析/不接 parser | [x] |
+| T003 | 确认 schema 策略 | [x] |
+| T004 | route_type + routing rule | [x] |
+| T005 | Parser Router service | [x] |
+| T006 | parser_route_report | [x] |
+| T007 | CLI route-parsers | [x] |
+| T008 | pytest 单元 | [x] |
+| T009 | CLI E2E | [x] |
+| T010 | 原始文件保护 | [x] |
+| T011 | raw_vault 保护 | [x] |
+| T012 | 幂等性 | [x] |
 | T013 | 验收与 Handoff | [ ] |
 
 ---

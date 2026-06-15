@@ -9,6 +9,7 @@ from app.core.config import DEFAULT_CONFIG_PATH, load_config
 from app.services.duplicate_governance import DuplicateGovernanceService
 from app.services.file_content_vault import FileContentVaultService
 from app.services.inventory_scanner import InventoryScanner
+from app.services.parser_router import ParserRouterService
 
 app = typer.Typer(help="Personal KB CLI. Implement commands according to specs.")
 console = Console()
@@ -132,6 +133,48 @@ def govern_duplicates(
         console.print(f"Duplicate report: {result.duplicate_report_path}")
     if result.cleanup_suggestion_report_path is not None:
         console.print(f"Cleanup suggestion report: {result.cleanup_suggestion_report_path}")
+
+
+@app.command("route-parsers")
+def route_parsers(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of vault-copied contents to route.",
+    ),
+    sha256: str | None = typer.Option(
+        None,
+        "--sha256",
+        help="Process only the specified content sha256.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Process only the specified content uid (same as sha256 in 001).",
+    ),
+) -> None:
+    config_path = config or DEFAULT_CONFIG_PATH
+    app_config = load_config(config_path)
+    service = ParserRouterService(app_config)
+    result = service.route_parsers(
+        limit=limit,
+        sha256=sha256,
+        content_uid=content_uid,
+    )
+
+    console.print(f"Candidates: {result.candidates}")
+    console.print(f"Routed: {result.routed}")
+    console.print(f"Skipped: {result.skipped}")
+    console.print(f"Unknown: {result.unknown}")
+    console.print(f"Unsupported: {result.unsupported}")
+    console.print(f"Errors: {len(result.errors)}")
+    if result.report_path is not None:
+        console.print(f"Parser route report: {result.report_path}")
 
 
 @app.command("build-parse-queue")
