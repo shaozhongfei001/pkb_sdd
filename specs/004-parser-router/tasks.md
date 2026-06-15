@@ -33,6 +33,10 @@ config/**
 docs/**
 .cursor/**
 raw_vault/**（真实产物）
+parsed/**
+curated/**
+quarantine/**
+data/**
 specs/004-parser-router/plan.md
 specs/其他编号/**
 ```
