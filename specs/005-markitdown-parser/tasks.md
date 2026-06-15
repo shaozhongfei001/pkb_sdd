@@ -15,10 +15,10 @@
 | **P2** | DB | Plan Re-Review | PASS_WITH_NOTES |
 | **P3** | Dev | 只读实现方案（不写代码） | [x] |
 | **P4** | TL | Review & Approval | [x] |
-| **P5** | Dev | Implementation（白名单内） | [ ] |
-| **P6** | DB | Implementation Review | [ ] |
-| **P7** | QA | E2E 验收 A001–A017 | [ ] |
-| **P8** | HO | Handoff 文档 | [ ] |
+| **P5** | Dev | Implementation（白名单内） | [x] |
+| **P6** | DB | Implementation Review | PASS_WITH_NOTES |
+| **P7** | QA | E2E 验收 A001–A018 | PASS_WITH_NOTES |
+| **P8** | HO | Handoff 文档 | [x] |
 | **P9** | TL | Final Review / merge 决策 | [ ] |
 
 **门禁**：P2 未 PASS → 不得 P5；P6 未 PASS → 不得 P7；P7 未 PASS → 不得 P8/P9。
@@ -251,10 +251,10 @@ specs/其他编号/**
 
 ### T015 DB Agent 审查 Dev diff
 
-- [ ] 无 SQL / migration 变更
-- [ ] 无 ORM 写库、无 parse_status 更新
-- [ ] 无 kb_parse_job / kb_document 引用写路径
-- [ ] 结论：**PASS** / **需修改**
+- [x] 无 SQL / migration 变更
+- [x] 无 ORM 写库、无 parse_status 更新
+- [x] 无 kb_parse_job / kb_document 引用写路径
+- [x] 结论：**PASS_WITH_NOTES**（DB-NOTE-1–4；无阻断项）
 
 ---
 
@@ -262,10 +262,10 @@ specs/其他编号/**
 
 ### T016 QA 执行验收
 
-- [ ] 对照 `test_cases.md` 与 `acceptance.md` A001–A017
-- [ ] 必查四项：原始文件、raw_vault、幂等、异常 continue
-- [ ] 输出验收表 + 证据
-- [ ] STOP → P8 Handoff（通过）或交还 Dev（不通过）
+- [x] 对照 `test_cases.md` 与 `acceptance.md` A001–A018
+- [x] 必查四项：原始文件、raw_vault、幂等、异常 continue
+- [x] 输出验收表 + 证据
+- [x] STOP → P8 Handoff（**PASS_WITH_NOTES**，无阻断项）
 
 ---
 
@@ -273,9 +273,9 @@ specs/其他编号/**
 
 ### T017 HO 撰写交接文档
 
-- [ ] `docs/handoff-phase1-005-markitdown-parser.md`
-- [ ] 含分支、commit、文件清单、测试结果、A001–A017
-- [ ] 明确：005 无 DB 写；parse registry 入口条件给 006
+- [x] `docs/handoff-phase1-005-markitdown-parser.md`
+- [x] 含分支、commit、文件清单、测试结果、A001–A018
+- [x] 明确：005 无 DB 写；parse registry 入口条件给 006
 
 ---
 
@@ -302,11 +302,11 @@ specs/其他编号/**
 | T007 | P3 | Dev DB 边界确认 | [x] |
 | T008 | P4 | TL Review & Approval | [x] APPROVED_FOR_P5 |
 | T009–T014 | P5 | Dev Implementation | [x] |
-| T015 | P6 | DB Implementation Review | [ ] |
-| T016 | P7 | E2E QA | [ ] |
-| T017 | P8 | Handoff | [ ] |
+| T015 | P6 | DB Implementation Review | [x] PASS_WITH_NOTES |
+| T016 | P7 | E2E QA | [x] PASS_WITH_NOTES |
+| T017 | P8 | Handoff | [x] |
 | T018 | P9 | TL Final Review | [ ] |
 
 ---
 
-**Tasks 结束** — 当前 STOP 点：**P6 DB Implementation Review**（P5 Dev 已完成，等待 DB 审查）。
+**Tasks 结束** — 当前 STOP 点：**P9 Tech Lead Final Review**（P8 Handoff 已完成，等待 TL merge 决策）。
