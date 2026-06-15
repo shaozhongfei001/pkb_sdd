@@ -1,0 +1,42 @@
+---
+description: Multi-agent collaboration roles and workflow gates
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Agent Collaboration Rules
+
+Read `docs/agent_collaboration_standard.md` before multi-agent work on any Spec.
+
+## Role principles
+
+| Role | Core duty | Hard ban |
+|------|-----------|----------|
+| **Tech Lead (`TL`)** | Scope, Plan, design review, **final review**. **No code.** | Write `backend/**`. Must **refuse** out-of-scope tasks. |
+| **Dev (`DEV`)** | Code **only** within TL-approved file whitelist. **Read tasks.md first.** | SQL schema changes. Touch original files or **real raw_vault** artifacts. |
+| **DB & Data (`DB`)** | Review SQL/ORM/data consistency only. Report idempotency, pollution, schema drift. | Edit business code (`backend/app/services/**`). |
+| **E2E QA (`QA`)** | Test design, run commands, acceptance table. Check readonly, re-run, error recovery. | Edit business services to pass tests. |
+| **Handoff (`HO`)** | Write `docs/handoff-*.md` only. Record commits, tests, done/undone, next-phase entry. | Code, specs, sql, or QA sign-off. |
+
+Only **Dev Agent** may edit production Python, and only on the TL whitelist.
+
+## Pipeline (mandatory)
+
+```text
+TL Plan → Dev (whitelist) → DB Review → E2E QA → Handoff → TL Final Review
+```
+
+One writer per file per iteration. No skipping DB or QA.
+
+## Global prohibitions
+
+- Do not move, delete, rename, or overwrite original user files.
+- Do not modify real `raw_vault` production artifacts (test `tmp_path` isolated copies OK).
+- Do not change SQL schema without Spec + migration authorization.
+- TL must refuse and narrow scope when tasks exceed the active Spec.
+
+## Session start
+
+Declare: role, Spec, branch, pipeline step, **TL file whitelist** (for DEV), blacklist.
+
+Templates: `docs/role_prompts/`.
