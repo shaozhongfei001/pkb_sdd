@@ -181,18 +181,18 @@ DuplicateGovernResult
 
 对每个候选 `kb_file_content`（`instance_count >= 2`）：
 
-1. 加载该 `sha256` 下全部 `kb_file_instance`（`status IN ('DISCOVERED', ...)` 可配置；默认含 `DISCOVERED`）。
-2. 若实际 instance 数 < 2 → 记 warning/error，跳过（数据不一致防护）。
+1. 加载该 `sha256` 下 **`status == 'DISCOVERED'`** 的 `kb_file_instance`（MVP 仅此状态；不含 `ERROR` 等）。
+2. 若实查 **DISCOVERED** instance 数 < 2 → 跳过，不建 group（见 §23 Q7：`--sha256` 单实例时为 skipped 汇总，不报错）。
 3. 设置 `duplicate_group_uid = sha256`。
 4. **upsert** `kb_duplicate_group`：
    - `duplicate_group_uid = sha256`
    - `sha256`、`content_uid = sha256`
-   - `instance_count = len(instances)`
+   - `instance_count = len(instances)`（仅计 DISCOVERED）
    - `master_file_instance_uid` = §9 规则选出
    - `decision = 'PENDING'`
-   - `decision_reason = NULL`（MVP 不写）
-5. **UPDATE** 组内每个 instance：`duplicate_group_uid = sha256`。
-6. 若组已存在且字段一致 → 计 `skipped`；否则 `upserted`。
+   - `decision_reason = NULL`（MVP 不写 DB 列；报告 `reason` 可说明与 001 content master 差异，见 §23 Q3）
+5. **UPDATE** 组内每个 instance：`duplicate_group_uid = sha256`（幂等：已是目标值则不计 upserted，见 §23 Q5）。
+6. 若 `kb_duplicate_group` 各字段与将写入值 **完全一致** → 计 `skipped`；有变化 → 计 `upserted`。
 
 **不写入** `kb_version_candidate_group`。
 
@@ -216,7 +216,9 @@ DuplicateGovernResult
 
 **说明**：
 
-- 规则 1 与 001 扫描顺序通常一致，但 003 **以本规则重算** 并写入 duplicate group，**不修改** `kb_file_content.master_file_instance_uid`（002 vault 源不变）。
+- 规则 1 与 001 扫描顺序通常一致，但 003 **以本规则重算** 并写入 duplicate group。
+- **不修改** `kb_file_content.master_file_instance_uid`（002 vault 复制源保持不变）。
+- 报告与 cleanup suggestion 中的 master **仅指 003 group master**（`kb_duplicate_group.master_file_instance_uid`）。若与 `kb_file_content.master_file_instance_uid` 不同，可在 suggestion `reason` 中说明，**不**回写 content 表（见 §23 Q3）。
 - 文件名规则对 fixtures `方案.txt` vs `方案副本.txt`：`方案.txt` 应胜出。
 - 全部 tie-break 必须确定性；同输入多次运行结果相同。
 
@@ -349,7 +351,8 @@ python -m app.cli.main govern-duplicates [OPTIONS]
 | `--sha256 HEX` | 仅处理指定内容 |
 | `--content-uid UID` | 同 `--sha256`（001 中 `content_uid = sha256`） |
 | `--limit N` | 最多处理 N 个候选 content |
-| `--dry-run` | 可选：只输出报告不写 DB（若实现成本高，MVP 可省略，Plan 允许 Dev 评估） |
+
+**003 MVP 不实现 `--dry-run`**（见 §23 Q2）。
 
 ### 12.3 执行流程
 
@@ -448,7 +451,8 @@ def build_cleanup_suggestions(group, master, instances) -> list[dict]: ...
 
 | 场景 | 行为 |
 |------|------|
-| 重复执行 `govern-duplicates` | `kb_duplicate_group` upsert 同键更新；`duplicate_group_uid` 已是目标值则 skip 计数 |
+| 重复执行 `govern-duplicates` | `kb_duplicate_group` upsert 同键；**group 各字段无变化** → 计 `skipped`（见 §23 Q5） |
+| instance link | `duplicate_group_uid` UPDATE 幂等；已是 `sha256` 的不重复计数为 upserted |
 | 同一 sha256 第三次 scan 新增 instance | 重跑 003 → 更新 `instance_count`、重新 link、报告反映新 instance |
 | master 规则稳定 | 同 instance 集合 → 同一 master uid |
 | 报告文件 | 每次运行 **新 timestamp 文件**（与 001 scan report 一致）；不覆盖旧报告 |
@@ -465,7 +469,7 @@ def build_cleanup_suggestions(group, master, instances) -> list[dict]: ...
 | 单组 DB 异常 | rollback 该组；记 error；continue |
 | 全局 DB 连接失败 | 任务失败，exit non-zero |
 | 报告目录不可写 | 记 error；DB 已提交部分不自动回滚（与 001 对齐） |
-| `--sha256` 不存在或非重复 | 空结果 + 友好汇总 |
+| `--sha256` / `--content-uid` 指向 **单实例** content（`instance_count < 2` 或 DISCOVERED < 2） | **空结果或 skipped 汇总**；exit 0；**不建 group、不报错**（见 §23 Q7） |
 
 **不 swallow exception**：必须 log + 写入 `errors[]`。
 
@@ -502,12 +506,15 @@ def build_cleanup_suggestions(group, master, instances) -> list[dict]: ...
 | `test_govern_chinese_path` | 中文路径正常 |
 | `test_govern_master_selection_copy_like_name` | `方案副本.txt` 不为 master |
 | `test_govern_single_content_no_group` | instance_count=1 不建 group |
+| `test_govern_sha256_single_instance_skipped` | `--sha256` 指向单实例：skipped/空结果，不报错（§23 Q7） |
 | `test_govern_single_group_error_continues` | mock 单组失败不中断（若可测） |
 | `test_original_files_unchanged` | stat + hash |
 | `test_raw_vault_unchanged` | vault bin 不变 |
 | `test_govern_project_fixtures_integration` | scan → copy-to-vault → govern-duplicates |
 
-目标：**约 7–9 个** test functions。
+目标：**约 8–10 个** test functions。
+
+**测试数据清理（§23 Q6）**：仅 pytest helper / teardown 可 DELETE 测试库行与 `tmp_path` 产物；service 业务逻辑不得 delete 原始文件或 raw_vault。
 
 ### 19.2 CLI E2E
 
@@ -573,7 +580,7 @@ pytest -q tests/test_inventory_scanner.py tests/test_file_content_vault.py tests
 | 操作 | 文件 |
 |------|------|
 | **新增** | `backend/app/services/duplicate_governance.py` |
-| **新增** | `backend/app/models/duplicate.py`（或扩 `models/file.py` 增加 `KbDuplicateGroup`） |
+| **新增** | `backend/app/models/duplicate.py`（`KbDuplicateGroup`；**不**扩 `models/file.py`，见 §23 Q1） |
 | **修改** | `backend/app/cli/main.py`（新增 `govern-duplicates`） |
 | **新增** | `backend/tests/test_duplicate_governance.py` |
 | **修改** | `specs/003-duplicate-governance/tasks.md`（勾选完成项） |
@@ -603,4 +610,18 @@ Dev **不得**自我宣布 A001–A006 通过。
 
 ---
 
-**Plan 结束** — 请 Dev Agent 先读 `tasks.md` 与白名单后再写代码。
+## 23. TL 实现决策（Dev 必遵）
+
+| # | 问题 | TL 决策 |
+|---|------|---------|
+| **Q1** | `KbDuplicateGroup` 放哪里 | 使用 `backend/app/models/duplicate.py`，**不要**扩 `file.py` |
+| **Q2** | 是否实现 `--dry-run` | **003 MVP 不实现** |
+| **Q3** | 003 group master 与 001 content master 不一致 | **不修改** `kb_file_content.master_file_instance_uid`；报告只写 **003 group master**；可在 cleanup `reason` 中说明与 content master 差异 |
+| **Q4** | instance 状态过滤 | MVP **仅处理** `status == "DISCOVERED"` |
+| **Q5** | `skipped` 计数 | **group** 各字段无变化 → 计 `skipped`；**instance** `duplicate_group_uid` 幂等 UPDATE（已是目标值不重复计 upserted） |
+| **Q6** | 测试清理是否可 delete 测试数据 | **仅 pytest helper / teardown** 可清理测试 DB 行与 `tmp_path`；**业务逻辑**禁止删除原始文件与 raw_vault |
+| **Q7** | `--sha256` 指向单实例内容 | **空结果或 skipped 汇总**；不报错；**不建 group** |
+
+---
+
+**Plan 结束** — 请 Dev Agent 先读 `tasks.md`、§23 与白名单后再写代码。
