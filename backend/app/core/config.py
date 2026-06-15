@@ -38,6 +38,7 @@ class RawConfig:
 
 @dataclass(frozen=True)
 class AppConfig:
+    pipeline_version: str
     storage: StorageConfig
     mysql: MysqlConfig
     raw: RawConfig
@@ -66,6 +67,7 @@ def load_config(config_path: Path | None = None) -> AppConfig:
     storage_data = data["storage"]
     mysql_data = data["mysql"]
     raw_data = data.get("raw", {})
+    app_data = data.get("app", {})
 
     storage = StorageConfig(
         source_registry_root=_resolve_storage_path(
@@ -91,9 +93,14 @@ def load_config(config_path: Path | None = None) -> AppConfig:
             raw_data.get("copy_unique_content_to_vault", True)
         ),
     )
-    return AppConfig(storage=storage, mysql=mysql, raw=raw)
+    return AppConfig(
+        pipeline_version=str(app_data.get("pipeline_version", "v1.1")),
+        storage=storage,
+        mysql=mysql,
+        raw=raw,
+    )
 
 
 def ensure_readonly(config: AppConfig) -> None:
     if not config.raw.original_files_readonly:
-        raise RuntimeError("original_files_readonly must be true for inventory scan")
+        raise RuntimeError("original_files_readonly must be true")

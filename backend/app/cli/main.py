@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from app.core.config import DEFAULT_CONFIG_PATH, load_config
+from app.services.file_content_vault import FileContentVaultService
 from app.services.inventory_scanner import InventoryScanner
 
 app = typer.Typer(help="Personal KB CLI. Implement commands according to specs.")
@@ -39,6 +40,51 @@ def scan(
     console.print(f"New contents: {result.new_contents}")
     console.print(f"Updated contents: {result.updated_contents}")
     console.print(f"Duplicate instances: {result.duplicate_instances}")
+    console.print(f"Errors: {len(result.errors)}")
+
+
+@app.command("copy-to-vault")
+def copy_to_vault(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of content records to process.",
+    ),
+    sha256: str | None = typer.Option(
+        None,
+        "--sha256",
+        help="Process only the specified content sha256.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Process only the specified content uid (same as sha256 in 001).",
+    ),
+    refresh_metadata_only: bool = typer.Option(
+        False,
+        "--refresh-metadata-only",
+        help="Refresh sidecar JSON and DB metadata without copying original.bin.",
+    ),
+) -> None:
+    config_path = config or DEFAULT_CONFIG_PATH
+    app_config = load_config(config_path)
+    service = FileContentVaultService(app_config)
+    result = service.copy_to_vault(
+        limit=limit,
+        sha256=sha256,
+        content_uid=content_uid,
+        refresh_metadata_only=refresh_metadata_only,
+    )
+
+    console.print(f"Candidates: {result.candidates}")
+    console.print(f"Copied: {result.copied}")
+    console.print(f"Skipped (already copied): {result.skipped}")
+    console.print(f"Metadata refreshed: {result.metadata_refreshed}")
     console.print(f"Errors: {len(result.errors)}")
 
 
