@@ -203,47 +203,47 @@ specs/其他编号/**
 
 ### T009 实现 parsed_paths 模块
 
-- [ ] 新增 `backend/app/core/parsed_paths.py`
-- [ ] `build_parsed_content_dir()` 符合 plan §8
-- [ ] `build_parsed_artifact_paths()` 返回三文件路径
+- [x] 新增 `backend/app/core/parsed_paths.py`
+- [x] `build_parsed_content_dir()` 符合 plan §8
+- [x] `build_parsed_artifact_paths()` 返回三文件路径
 
 ### T010 实现 MarkItDownAdapter
 
-- [ ] 新增 `backend/app/adapters/markitdown_adapter.py`
-- [ ] CLI **不** import markitdown
-- [ ] `parser_adapter_version = "005_mvp_v1"`
-- [ ] `convert()` 返回 text + metadata + warnings
+- [x] 新增 `backend/app/adapters/markitdown_adapter.py`
+- [x] CLI **不** import markitdown
+- [x] `parser_adapter_version = "005_mvp_v1"`
+- [x] `convert()` 返回 text + metadata + warnings
 
 ### T011 实现 MarkItDownParserService
 
-- [ ] 新增 `backend/app/services/markitdown_parser.py`
-- [ ] MySQL **只读**查询 + `match_route_type()` 筛选
-- [ ] `_resolve_vault_dir` / `_resolve_original_bin` 内部调用 `build_vault_dir` + `build_vault_artifact_paths`
-- [ ] **禁止**硬编码 raw_vault 三档路径
-- [ ] 只读 open `original_bin`；写 parsed 三文件（FAILED 仅 manifest）+ 幂等 skip
-- [ ] 写 `parse_markitdown_report_*.json`（含 `in_scope_candidates`）
-- [ ] **禁止**任何 session.add/commit/update/delete 业务表
+- [x] 新增 `backend/app/services/markitdown_parser.py`
+- [x] MySQL **只读**查询 + `match_route_type()` 筛选
+- [x] `_resolve_vault_dir` / `_resolve_original_bin` 内部调用 `build_vault_dir` + `build_vault_artifact_paths`
+- [x] **禁止**硬编码 raw_vault 三档路径
+- [x] 只读 open `original.bin`；写 parsed 三文件（FAILED 仅 manifest）+ 幂等 skip
+- [x] 写 `parse_markitdown_report_*.json`（含 `in_scope_candidates`）
+- [x] **禁止**任何 session.add/commit/update/delete 业务表
 
 ### T012 实现 CLI parse-markitdown
 
-- [ ] 修改 `backend/app/cli/main.py`
-- [ ] 选项：`--config`、`--sha256`、`--content-uid`、`--limit`、`--dry-run`
-- [ ] 护栏：三者至少其一；limit ≤ 100
-- [ ] `ensure_readonly()` 在入口
+- [x] 修改 `backend/app/cli/main.py`
+- [x] 选项：`--config`、`--sha256`、`--content-uid`、`--limit`、`--dry-run`
+- [x] 护栏：三者至少其一；limit ≤ 100
+- [x] `ensure_readonly()` 在入口
 
 ### T013 实现 pytest
 
-- [ ] 新增 `backend/tests/test_markitdown_parser.py`（≥20 functions）
-- [ ] **默认 mock** `MarkItDownAdapter.convert`；真实 markitdown 仅 txt/md（可选）
-- [ ] 覆盖 `test_cases.md` 全部 TC（含 vault 路径 TC038–TC040）
-- [ ] 含 no-DB-write、raw_vault/original 不变、vault_paths 未改断言
+- [x] 新增 `backend/tests/test_markitdown_parser.py`（≥20 functions）
+- [x] **默认 mock** `MarkItDownAdapter.convert`；真实 markitdown 仅 txt/md（可选）
+- [x] 覆盖 `test_cases.md` 全部 TC（含 vault 路径 TC038–TC040）
+- [x] 含 no-DB-write、raw_vault/original 不变、vault_paths 未改断言
 
 ### T014 Dev 自检 STOP
 
-- [ ] 改动文件均在白名单内
-- [ ] `tasks.md` P5 项勾选
-- [ ] 输出：文件清单、pytest/CLI 命令、遗留问题
-- [ ] STOP → **P6 DB Implementation Review**（Dev 不自我验收）
+- [x] 改动文件均在白名单内
+- [x] `tasks.md` P5 项勾选
+- [x] 输出：文件清单、pytest/CLI 命令、遗留问题
+- [x] STOP → **P6 DB Implementation Review**（Dev 不自我验收）
 
 ---
 
@@ -301,7 +301,7 @@ specs/其他编号/**
 | T006 | P3 | Dev 只读方案 | [x] |
 | T007 | P3 | Dev DB 边界确认 | [x] |
 | T008 | P4 | TL Review & Approval | [x] APPROVED_FOR_P5 |
-| T009–T014 | P5 | Dev Implementation | [ ] |
+| T009–T014 | P5 | Dev Implementation | [x] |
 | T015 | P6 | DB Implementation Review | [ ] |
 | T016 | P7 | E2E QA | [ ] |
 | T017 | P8 | Handoff | [ ] |
@@ -309,4 +309,4 @@ specs/其他编号/**
 
 ---
 
-**Tasks 结束** — 当前 STOP 点：**P5 Dev Implementation**（TL 已 APPROVED_FOR_P5）。
+**Tasks 结束** — 当前 STOP 点：**P6 DB Implementation Review**（P5 Dev 已完成，等待 DB 审查）。

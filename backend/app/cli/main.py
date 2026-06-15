@@ -9,6 +9,10 @@ from app.core.config import DEFAULT_CONFIG_PATH, load_config
 from app.services.duplicate_governance import DuplicateGovernanceService
 from app.services.file_content_vault import FileContentVaultService
 from app.services.inventory_scanner import InventoryScanner
+from app.services.markitdown_parser import (
+    PARSE_MARKITDOWN_MAX_LIMIT,
+    MarkItDownParserService,
+)
 from app.services.parser_router import ParserRouterService
 
 app = typer.Typer(help="Personal KB CLI. Implement commands according to specs.")
@@ -175,6 +179,78 @@ def route_parsers(
     console.print(f"Errors: {len(result.errors)}")
     if result.report_path is not None:
         console.print(f"Parser route report: {result.report_path}")
+
+
+@app.command("parse-markitdown")
+def parse_markitdown(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    sha256: str | None = typer.Option(
+        None,
+        "--sha256",
+        help="Process only the specified content sha256.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Process only the specified content uid (same as sha256 in 001).",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of in-scope contents to parse.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Do not write parsed artifacts or call MarkItDown.",
+    ),
+) -> None:
+    if not sha256 and not content_uid and limit is None:
+        console.print(
+            "ERROR: must provide at least one of --sha256, --content-uid, or --limit"
+        )
+        raise typer.Exit(code=1)
+    if limit is not None and limit < 1:
+        console.print("ERROR: --limit must be >= 1")
+        raise typer.Exit(code=1)
+    if limit is not None and limit > PARSE_MARKITDOWN_MAX_LIMIT:
+        console.print(f"ERROR: --limit must be <= {PARSE_MARKITDOWN_MAX_LIMIT}")
+        raise typer.Exit(code=1)
+
+    config_path = config or DEFAULT_CONFIG_PATH
+    app_config = load_config(config_path)
+
+    if not dry_run:
+        from app.adapters.markitdown_adapter import MarkItDownAdapter, MarkItDownAdapterError
+
+        try:
+            MarkItDownAdapter.check_import()
+        except MarkItDownAdapterError as exc:
+            console.print(f"ERROR: {exc.message}")
+            raise typer.Exit(code=1) from exc
+
+    service = MarkItDownParserService(app_config)
+    result = service.parse_markitdown(
+        sha256=sha256,
+        content_uid=content_uid,
+        limit=limit,
+        dry_run=dry_run,
+    )
+
+    console.print(f"Candidates: {result.total_candidates}")
+    console.print(f"In-scope candidates: {result.in_scope_candidates}")
+    console.print(f"Parsed: {result.parsed_count}")
+    console.print(f"Skipped: {result.skipped_count}")
+    console.print(f"Failed: {result.failed_count}")
+    console.print(f"Empty: {result.empty_count}")
+    console.print(f"Dry run: {result.dry_run}")
+    console.print(f"Errors: {len(result.errors)}")
+    if result.report_path is not None:
+        console.print(f"Parse markitdown report: {result.report_path}")
 
 
 @app.command("build-parse-queue")
