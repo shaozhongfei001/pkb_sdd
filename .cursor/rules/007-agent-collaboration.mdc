@@ -1,5 +1,5 @@
 ---
-description: Multi-agent collaboration roles and workflow gates
+description: Multi-agent collaboration roles, SDD pipeline gates, and global prohibitions
 globs: ["**/*"]
 alwaysApply: true
 ---
@@ -7,6 +7,25 @@ alwaysApply: true
 # Agent Collaboration Rules
 
 Read `docs/agent_collaboration_standard.md` before multi-agent work on any Spec.
+
+## SDD pipeline (mandatory)
+
+This project follows **SDD** (Spec-Driven Development). Each Spec phase:
+
+```text
+Plan → Implementation → Test → Acceptance → Handoff → Final Review
+```
+
+Agent pipeline:
+
+```text
+TL Plan → Dev (whitelist) → DB Review → E2E QA → Handoff → TL Final Review
+```
+
+- No Plan / Tasks → no implementation.
+- No DB pass → no QA.
+- No QA pass → no merge-ready handoff.
+- One writer per file per iteration. No skipping DB or QA.
 
 ## Role principles
 
@@ -18,25 +37,37 @@ Read `docs/agent_collaboration_standard.md` before multi-agent work on any Spec.
 | **E2E QA (`QA`)** | Test design, run commands, acceptance table. Check readonly, re-run, error recovery. | Edit business services to pass tests. |
 | **Handoff (`HO`)** | Write `docs/handoff-*.md` only. Record commits, tests, done/undone, next-phase entry. | Code, specs, sql, or QA sign-off. |
 
-Only **Dev Agent** may edit production Python, and only on the TL whitelist.
+Only **Dev Agent** may edit production Python, and **only** when explicitly in step ② Implementation with a TL file whitelist.
 
-## Pipeline (mandatory)
-
-```text
-TL Plan → Dev (whitelist) → DB Review → E2E QA → Handoff → TL Final Review
-```
-
-One writer per file per iteration. No skipping DB or QA.
-
-## Global prohibitions
-
-- Do not move, delete, rename, or overwrite original user files.
-- Do not modify real `raw_vault` production artifacts (test `tmp_path` isolated copies OK).
-- Do not change SQL schema without Spec + migration authorization.
-- TL must refuse and narrow scope when tasks exceed the active Spec.
+**Default rule**: Tech Lead / DB & Data / E2E QA / Handoff **must not** edit business code.
 
 ## Session start
 
 Declare: role, Spec, branch, pipeline step, **TL file whitelist** (for DEV), blacklist.
 
 Templates: `docs/role_prompts/`.
+
+## Global prohibitions (all phases)
+
+- Do not analyze **source-code repositories** (Java/Python/JS etc.) as KB assets.
+- Do not move, delete, rename, or overwrite **original user files**.
+- Do not **auto-delete duplicate files**.
+- Do not delete **raw_vault** files (002 copies are append-only; idempotent skip if bin exists).
+- Do not integrate **MinerU** or **MarkItDown** early (006 / 005+).
+- Do not build **Parser Router** (004+), **`parsed/`**, **`curated/`**, **Streamlit** (012+), **vector DB** (011+), or **project-card distillation** early.
+- Do not change **SQL schema** without Spec authorization and migration.
+- Do not upload private documents to external cloud services by default.
+- TL must refuse and narrow scope when tasks exceed the active Spec.
+
+## 003 duplicate-governance constraints (when active)
+
+- Exact **sha256** duplicates only — no semantic similarity dedup.
+- Output `duplicate_report` and `cleanup_suggestion_report` only.
+- **`auto_execute = false`** — suggestions only; no delete/move/rename/quarantine execution.
+- No LLM master selection; use 001 `master_file_instance_uid`.
+- Do not modify `inventory_scanner.py` or `file_content_vault.py`.
+
+## Sealed services (003 default)
+
+- `backend/app/services/inventory_scanner.py`
+- `backend/app/services/file_content_vault.py`
