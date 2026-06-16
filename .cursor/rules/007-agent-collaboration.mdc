@@ -53,7 +53,7 @@ Templates: `docs/role_prompts/`.
 - Do not move, delete, rename, or overwrite **original user files**.
 - Do not **auto-delete duplicate files**.
 - Do not delete **raw_vault** files (002 copies are append-only; idempotent skip if bin exists).
-- Do not integrate **MinerU** or **MarkItDown** early (006 / 005+).
+- Do not integrate parser behavior before its active Spec. Completed parser contracts are 005 MarkItDown (`parse-markitdown`) and 007 MinerU PDF parser adapter (`parse-mineru-pdf`); new parser behavior must follow the completed parsed artifact contract unless a later Spec explicitly changes it.
 - Do not build **Parser Router** (004+), **`parsed/`**, **`curated/`**, **Streamlit** (012+), **vector DB** (011+), or **project-card distillation** early.
 - Do not change **SQL schema** without Spec authorization and migration.
 - Do not upload private documents to external cloud services by default.

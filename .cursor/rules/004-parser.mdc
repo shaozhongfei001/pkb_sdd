@@ -7,6 +7,8 @@ alwaysApply: true
 # Parser Rules
 
 - MarkItDown handles ordinary Office, HTML, XML, JSON, TXT files.
-- MinerU handles PDF, images, scans, complex layout and high-value documents.
-- Parser output goes under parsed/by_hash/{sha256_prefix}/{sha256}/{parser_profile}/.
+- MinerU handles PDF documents routed to PDF_DIGITAL / PDF_SCANNED_OR_IMAGE by the parser router; IMAGE parsing is not in the completed 007 scope.
+- Parser output goes under parsed/by_hash/{sha256[:2]}/{sha256[2:4]}/{sha256}/.
+- Standard parsed artifacts are parsed_text.md, parsed_metadata.json, and parse_manifest.json.
+- parser_profile and parser_adapter_version are recorded in parse_manifest.json, not as path segments.
 - Same content with same parser profile must be idempotent.
