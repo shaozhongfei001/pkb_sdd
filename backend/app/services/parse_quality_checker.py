@@ -225,6 +225,28 @@ def _increment(bucket: dict[str, int], key: str | None) -> None:
     bucket[label] = bucket.get(label, 0) + 1
 
 
+def _os_error_evidence(exc: OSError, path: Path) -> dict[str, Any]:
+    return {
+        "error": type(exc).__name__,
+        "errno": exc.errno,
+        "path": path.as_posix(),
+    }
+
+
+def _safe_is_dir(path: Path) -> tuple[bool, OSError | None]:
+    try:
+        return path.is_dir(), None
+    except OSError as exc:
+        return False, exc
+
+
+def _safe_is_file(path: Path) -> tuple[bool, OSError | None]:
+    try:
+        return path.is_file(), None
+    except OSError as exc:
+        return False, exc
+
+
 class ParseQualityCheckerService:
     def __init__(
         self,
@@ -465,7 +487,27 @@ class ParseQualityCheckerService:
                 )
             )
 
-        if not original_bin.is_file():
+        is_file, file_err = _safe_is_file(original_bin)
+        if file_err is not None:
+            issues.append(
+                ParseQualityIssue(
+                    issue_code="MISSING_RAW_VAULT_OBJECT",
+                    severity=SEVERITY_ERROR,
+                    content_uid=vault_object.content_uid,
+                    sha256=vault_object.sha256,
+                    parser_name=None,
+                    parser_adapter_version=None,
+                    artifact_type="RAW_VAULT",
+                    path=original_bin.as_posix(),
+                    message=f"Cannot access raw_vault original.bin: {file_err}",
+                    evidence={
+                        "vault_path": vault_object.vault_path,
+                        "original_bin": original_bin.as_posix(),
+                        **_os_error_evidence(file_err, original_bin),
+                    },
+                )
+            )
+        elif not is_file:
             issues.append(
                 ParseQualityIssue(
                     issue_code="MISSING_RAW_VAULT_OBJECT",
@@ -545,7 +587,25 @@ class ParseQualityCheckerService:
             "parser_adapter_version": candidate.parser_adapter_version,
         }
 
-        if not parsed_dir.is_dir():
+        is_dir, dir_err = _safe_is_dir(parsed_dir)
+        if dir_err is not None:
+            issues.append(
+                ParseQualityIssue(
+                    issue_code="MISSING_PARSED_DIR",
+                    severity=SEVERITY_ERROR,
+                    artifact_type="PARSED_DIR",
+                    path=parsed_dir.as_posix(),
+                    message=f"Cannot access parsed directory: {dir_err}",
+                    evidence={
+                        "parsed_dir": parsed_dir.as_posix(),
+                        **_os_error_evidence(dir_err, parsed_dir),
+                    },
+                    **base_kwargs,
+                )
+            )
+            return issues
+
+        if not is_dir:
             issues.append(
                 ParseQualityIssue(
                     issue_code="MISSING_PARSED_DIR",
@@ -565,7 +625,24 @@ class ParseQualityCheckerService:
             ("MISSING_PARSE_MANIFEST", "parse_manifest", "PARSE_MANIFEST"),
         ):
             file_path = artifact_paths[key]
-            if not file_path.is_file():
+            is_file, file_err = _safe_is_file(file_path)
+            if file_err is not None:
+                issues.append(
+                    ParseQualityIssue(
+                        issue_code=code,
+                        severity=SEVERITY_ERROR,
+                        artifact_type=artifact_type,
+                        path=file_path.as_posix(),
+                        message=f"Cannot access parsed artifact: {file_err}",
+                        evidence={
+                            "parsed_dir": parsed_dir.as_posix(),
+                            **_os_error_evidence(file_err, file_path),
+                        },
+                        **base_kwargs,
+                    )
+                )
+                continue
+            if not is_file:
                 issues.append(
                     ParseQualityIssue(
                         issue_code=code,
@@ -596,12 +673,42 @@ class ParseQualityCheckerService:
             "path": manifest_path.as_posix(),
         }
 
-        if not manifest_path.is_file():
+        is_file, file_err = _safe_is_file(manifest_path)
+        if file_err is not None:
+            issues.append(
+                ParseQualityIssue(
+                    issue_code="MISSING_PARSE_MANIFEST",
+                    severity=SEVERITY_ERROR,
+                    message=f"Cannot access parse_manifest.json: {file_err}",
+                    evidence={
+                        "manifest_path": manifest_path.as_posix(),
+                        **_os_error_evidence(file_err, manifest_path),
+                    },
+                    **base_kwargs,
+                )
+            )
+            return None, issues
+
+        if not is_file:
             return None, issues
 
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        except OSError as exc:
+            issues.append(
+                ParseQualityIssue(
+                    issue_code="INVALID_PARSE_MANIFEST_JSON",
+                    severity=SEVERITY_ERROR,
+                    message=f"Cannot read parse_manifest.json: {exc}",
+                    evidence={
+                        "manifest_path": manifest_path.as_posix(),
+                        **_os_error_evidence(exc, manifest_path),
+                    },
+                    **base_kwargs,
+                )
+            )
+            return None, issues
+        except json.JSONDecodeError as exc:
             issues.append(
                 ParseQualityIssue(
                     issue_code="INVALID_PARSE_MANIFEST_JSON",
@@ -756,12 +863,14 @@ class ParseQualityCheckerService:
     ) -> list[ParseQualityIssue]:
         if candidate.result_status != "SUCCESS":
             return []
-        missing_paths = [
-            artifact_paths[key].as_posix()
-            for key in ("parsed_text", "parsed_metadata", "parse_manifest")
-            if not artifact_paths[key].is_file()
-        ]
-        if not missing_paths and parsed_dir.is_dir():
+        missing_paths: list[str] = []
+        for key in ("parsed_text", "parsed_metadata", "parse_manifest"):
+            file_path = artifact_paths[key]
+            is_file, _file_err = _safe_is_file(file_path)
+            if _file_err is not None or not is_file:
+                missing_paths.append(file_path.as_posix())
+        is_dir, _dir_err = _safe_is_dir(parsed_dir)
+        if not missing_paths and is_dir and _dir_err is None:
             return []
         return [
             ParseQualityIssue(
@@ -855,7 +964,27 @@ class ParseQualityCheckerService:
         artifact: KbParsedArtifact,
     ) -> list[ParseQualityIssue]:
         artifact_path = Path(artifact.artifact_path)
-        if artifact_path.is_file():
+        is_file, file_err = _safe_is_file(artifact_path)
+        if file_err is not None:
+            return [
+                ParseQualityIssue(
+                    issue_code="REGISTRY_ARTIFACT_PATH_MISSING",
+                    severity=SEVERITY_ERROR,
+                    content_uid=artifact.content_uid or None,
+                    sha256=artifact.sha256,
+                    parser_name=artifact.parser_name,
+                    parser_adapter_version=artifact.parser_adapter_version,
+                    artifact_type=artifact.artifact_type,
+                    path=artifact.artifact_path,
+                    message=f"Cannot access registry artifact path: {file_err}",
+                    evidence={
+                        "artifact_uid": artifact.artifact_uid,
+                        "artifact_type": artifact.artifact_type,
+                        **_os_error_evidence(file_err, artifact_path),
+                    },
+                )
+            ]
+        if is_file:
             return []
         return [
             ParseQualityIssue(

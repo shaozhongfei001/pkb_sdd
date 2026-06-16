@@ -895,3 +895,141 @@ raw:
         ["check-parse-quality", "--config", str(config_path), "--parser-name", "magic-pdf"],
     )
     assert result.exit_code == 1
+
+
+def _patch_path_is_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    deny_paths: set[str],
+    errno: int = 13,
+) -> None:
+    original_is_dir = Path.is_dir
+
+    def patched_is_dir(self: Path) -> bool:
+        if self.as_posix() in deny_paths:
+            raise PermissionError(errno, "Permission denied", self.as_posix())
+        return original_is_dir(self)
+
+    monkeypatch.setattr(Path, "is_dir", patched_is_dir)
+
+
+def _patch_path_is_file(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    deny_paths: set[str],
+    errno: int = 13,
+) -> None:
+    original_is_file = Path.is_file
+
+    def patched_is_file(self: Path) -> bool:
+        if self.as_posix() in deny_paths:
+            raise PermissionError(errno, "Permission denied", self.as_posix())
+        return original_is_file(self)
+
+    monkeypatch.setattr(Path, "is_file", patched_is_file)
+
+
+def test_p5_parsed_dir_permission_denied_generates_report(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sha256 = "p5" * 32
+    content_uid = sha256
+    forbidden_dir = "/tmp/pytest-of-root/forbidden/parsed"
+    parse_result = _parse_result(
+        sha256=sha256,
+        content_uid=content_uid,
+        parsed_dir=forbidden_dir,
+    )
+    _patch_path_is_dir(monkeypatch, deny_paths={forbidden_dir})
+    service = _checker(workspace, parse_results=[parse_result])
+    report = service.check()
+    assert report.report_path is not None
+    assert report.report_path.is_file()
+    issue = next(item for item in report.issues if item.issue_code == "MISSING_PARSED_DIR")
+    assert issue.severity == "ERROR"
+    assert issue.evidence["error"] == "PermissionError"
+    assert issue.evidence["errno"] == 13
+    assert issue.evidence["path"] == forbidden_dir
+    assert set(report.issue_counts) == set(ISSUE_CODES)
+
+
+def test_p5_parsed_text_permission_denied_generates_report(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sha256 = "p6" * 32
+    content_uid = sha256
+    parsed_dir = build_parsed_content_dir(workspace / "parsed", sha256)
+    artifacts = build_parsed_artifact_paths(parsed_dir)
+    parsed_dir.mkdir(parents=True)
+    artifacts["parsed_metadata"].write_text("{}", encoding="utf-8")
+    artifacts["parse_manifest"].write_text("{}", encoding="utf-8")
+    parse_result = _parse_result(
+        sha256=sha256,
+        content_uid=content_uid,
+        parsed_dir=parsed_dir.as_posix(),
+        manifest_path=artifacts["parse_manifest"].as_posix(),
+    )
+    _patch_path_is_file(monkeypatch, deny_paths={artifacts["parsed_text"].as_posix()})
+    service = _checker(workspace, parse_results=[parse_result])
+    report = service.check()
+    assert report.report_path is not None
+    issue = next(item for item in report.issues if item.issue_code == "MISSING_PARSED_TEXT")
+    assert issue.severity == "ERROR"
+    assert issue.evidence["error"] == "PermissionError"
+    assert issue.evidence["errno"] == 13
+    assert issue.evidence["path"] == artifacts["parsed_text"].as_posix()
+    assert set(report.issue_counts) == set(ISSUE_CODES)
+
+
+def test_p5_parse_manifest_permission_denied_generates_report(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sha256 = "p7" * 32
+    content_uid = sha256
+    parsed_dir = build_parsed_content_dir(workspace / "parsed", sha256)
+    artifacts = build_parsed_artifact_paths(parsed_dir)
+    parsed_dir.mkdir(parents=True)
+    artifacts["parsed_text"].write_text("x", encoding="utf-8")
+    artifacts["parsed_metadata"].write_text("{}", encoding="utf-8")
+    parse_result = _parse_result(
+        sha256=sha256,
+        content_uid=content_uid,
+        parsed_dir=parsed_dir.as_posix(),
+        manifest_path=artifacts["parse_manifest"].as_posix(),
+    )
+    _patch_path_is_file(monkeypatch, deny_paths={artifacts["parse_manifest"].as_posix()})
+    service = _checker(workspace, parse_results=[parse_result])
+    report = service.check()
+    assert report.report_path is not None
+    manifest_issues = [
+        issue
+        for issue in report.issues
+        if issue.issue_code in ("MISSING_PARSE_MANIFEST", "INVALID_PARSE_MANIFEST_JSON")
+    ]
+    assert manifest_issues
+    assert all(issue.severity == "ERROR" for issue in manifest_issues)
+    assert any(issue.evidence.get("error") == "PermissionError" for issue in manifest_issues)
+    assert set(report.issue_counts) == set(ISSUE_CODES)
+
+
+def test_p5_issue_counts_include_all_eighteen_codes_on_permission_error(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sha256 = "p8" * 32
+    content_uid = sha256
+    forbidden_dir = "/tmp/pytest-of-root/forbidden/parsed2"
+    parse_result = _parse_result(
+        sha256=sha256,
+        content_uid=content_uid,
+        parsed_dir=forbidden_dir,
+    )
+    _patch_path_is_dir(monkeypatch, deny_paths={forbidden_dir})
+    service = _checker(workspace, parse_results=[parse_result])
+    report = service.check()
+    assert set(report.issue_counts) == set(ISSUE_CODES)
+    assert len(report.issue_counts) == len(ISSUE_CODES)
+    assert all(isinstance(count, int) for count in report.issue_counts.values())
