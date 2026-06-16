@@ -13,6 +13,11 @@ from app.services.markitdown_parser import (
     PARSE_MARKITDOWN_MAX_LIMIT,
     MarkItDownParserService,
 )
+from app.services.mineru_pdf_parser import (
+    PARSE_MINERU_PDF_MAX_LIMIT,
+    MineruPdfParserService,
+    check_magic_pdf_available,
+)
 from app.services.parse_registry import (
     PARSE_REGISTRY_MAX_LIMIT,
     ParseRegistryError,
@@ -256,6 +261,105 @@ def parse_markitdown(
     console.print(f"Errors: {len(result.errors)}")
     if result.report_path is not None:
         console.print(f"Parse markitdown report: {result.report_path}")
+
+
+@app.command("parse-mineru-pdf")
+def parse_mineru_pdf(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    sha256: str | None = typer.Option(
+        None,
+        "--sha256",
+        help="Process only the specified content sha256.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Process only the specified content uid (same as sha256 in 001).",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of in-scope PDF contents to parse.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Plan only; do not call MinerU or write parsed artifacts.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Re-parse even when a SUCCESS parse_manifest.json already exists.",
+    ),
+    timeout: int = typer.Option(
+        600,
+        "--timeout",
+        help="MinerU subprocess timeout in seconds.",
+    ),
+    register: bool = typer.Option(
+        False,
+        "--register/--no-register",
+        help="Register batch report via ParseRegistryService after parsing.",
+    ),
+) -> None:
+    if not sha256 and not content_uid and limit is None:
+        console.print(
+            "ERROR: must provide at least one of --sha256, --content-uid, or --limit"
+        )
+        raise typer.Exit(code=1)
+    if limit is not None and limit < 1:
+        console.print("ERROR: --limit must be >= 1")
+        raise typer.Exit(code=1)
+    if limit is not None and limit > PARSE_MINERU_PDF_MAX_LIMIT:
+        console.print(f"ERROR: --limit must be <= {PARSE_MINERU_PDF_MAX_LIMIT}")
+        raise typer.Exit(code=1)
+    if timeout < 1:
+        console.print("ERROR: --timeout must be >= 1")
+        raise typer.Exit(code=1)
+
+    config_path = config or DEFAULT_CONFIG_PATH
+    app_config = load_config(config_path)
+
+    if not dry_run:
+        try:
+            check_magic_pdf_available()
+        except RuntimeError as exc:
+            console.print(f"ERROR: {exc}")
+            raise typer.Exit(code=1) from exc
+
+    service = MineruPdfParserService(app_config)
+    result = service.parse_many(
+        sha256=sha256,
+        content_uid=content_uid,
+        limit=limit,
+        dry_run=dry_run,
+        force=force,
+        timeout_seconds=timeout,
+        register=register and not dry_run,
+    )
+
+    console.print(f"Candidates: {result.total_candidates}")
+    console.print(f"In-scope candidates: {result.in_scope_candidates}")
+    console.print(f"Parsed: {result.parsed_count}")
+    console.print(f"Skipped: {result.skipped_count}")
+    console.print(f"Failed: {result.failed_count}")
+    console.print(f"Empty: {result.empty_count}")
+    console.print(f"Timeouts: {result.timeout_count}")
+    console.print(f"Partial: {result.partial_count}")
+    console.print(f"Dry run: {result.dry_run}")
+    console.print(f"Errors: {len(result.errors)}")
+    if dry_run:
+        for plan in result.plans:
+            console.print(
+                f"  plan {plan.sha256[:12]}... route={plan.route_type} "
+                f"decision={plan.decision} action={plan.dry_run_action}"
+            )
+    if result.report_path is not None:
+        console.print(f"Parse mineru pdf report: {result.report_path}")
 
 
 @app.command("register-parse-report")
