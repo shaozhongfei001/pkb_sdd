@@ -23,6 +23,7 @@ from app.services.parse_registry import (
     ParseRegistryError,
     ParseRegistryService,
 )
+from app.services.parse_quality_checker import ParseQualityCheckerService
 from app.services.parser_router import ParserRouterService
 
 app = typer.Typer(help="Personal KB CLI. Implement commands according to specs.")
@@ -549,6 +550,81 @@ def reconcile_parsed_artifacts_cmd(
     console.print(f"Results recorded: {result.results_recorded}")
     console.print(f"Artifacts recorded: {result.artifacts_recorded}")
     console.print(f"Errors: {len(result.errors)}")
+
+
+@app.command("check-parse-quality")
+def check_parse_quality(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    sha256: str | None = typer.Option(
+        None,
+        "--sha256",
+        help="Check only the specified content sha256.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Check only the specified content uid.",
+    ),
+    parser_name: str | None = typer.Option(
+        None,
+        "--parser-name",
+        help="Filter by parser name (markitdown or mineru).",
+    ),
+    status: str | None = typer.Option(
+        None,
+        "--status",
+        help="Filter by registry result status (SUCCESS, EMPTY, SKIPPED, FAILED).",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of parse results to inspect.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Optional report output path.",
+    ),
+    fail_on_issue: bool = typer.Option(
+        False,
+        "--fail-on-issue",
+        help="Exit with code 2 when issues are found.",
+    ),
+) -> None:
+    if limit is not None and limit < 1:
+        console.print("ERROR: --limit must be >= 1")
+        raise typer.Exit(code=1)
+
+    config_path = config or DEFAULT_CONFIG_PATH
+    try:
+        app_config = load_config(config_path)
+        service = ParseQualityCheckerService(app_config)
+        report = service.check(
+            sha256=sha256,
+            content_uid=content_uid,
+            parser_name=parser_name,
+            status=status,
+            limit=limit,
+            output=output,
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        console.print(f"ERROR: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"Issues: {report.summary['issue_count']}")
+    console.print(f"Critical: {report.summary['critical_count']}")
+    console.print(f"Errors: {report.summary['error_count']}")
+    console.print(f"Warnings: {report.summary['warning_count']}")
+    console.print(f"Checked parse results: {report.summary['checked_parse_result_count']}")
+    if report.report_path is not None:
+        console.print(f"Parse quality report: {report.report_path}")
+
+    if fail_on_issue and report.summary["issue_count"] > 0:
+        raise typer.Exit(code=2)
 
 
 @app.command("build-parse-queue")
