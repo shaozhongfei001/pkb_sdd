@@ -236,11 +236,13 @@ pkb_sdd_cursor/
     005-markitdown-parser/
     006-mineru-parser/
     007-quality-checker/
+    008-parse-quality-checker/
     008-review-workflow/
-    009-evidence-chain/
-    010-curated-project-assets/
-    011-search-service/
-    012-streamlit-admin/
+    009-quality-report-summary/
+    010-evidence-chain/
+    011-curated-project-assets/
+    012-search-service/
+    013-streamlit-admin/
     901-docker-compose-deployment/
     902-test-dataset/
 
@@ -581,9 +583,11 @@ parser.log
 - `quality_score`；
 - `quality_status`。
 
-### 8.9 008-review-workflow
+### 8.9 008-review-workflow（FUTURE STUB / NOT CURRENT）
 
-实现人工复核闭环。
+> 这不是已完成的 `008-parse-quality-checker`。权威状态见 `specs/SPEC_INDEX.md` §3。
+
+实现人工复核闭环（未来 Spec，当前未启动）。
 
 复核对象：
 
@@ -597,7 +601,13 @@ parser.log
 
 ## 9. 后续扩展 Specs
 
-### 9.1 009-evidence-chain
+> 权威索引见 `specs/SPEC_INDEX.md`。目录编号以 SPEC_INDEX 为准。
+
+### 9.1 009-quality-report-summary（当前 ACTIVE）
+
+只读消费 008 `parse_quality_report.json`，输出 Markdown / JSON 摘要；不连 MySQL、不读 raw_vault / parsed、不修复。
+
+### 9.2 010-evidence-chain
 
 实现证据链，包括：
 
@@ -609,7 +619,7 @@ parser.log
 - quote_text；
 - source_location。
 
-### 9.2 010-curated-project-assets
+### 9.3 011-curated-project-assets
 
 实现项目化知识资产：
 
@@ -621,19 +631,19 @@ reusable_assets
 lessons_learned
 ```
 
-### 9.3 011-search-service
+### 9.4 012-search-service
 
 实现基于 MySQL FULLTEXT 的检索服务。
 
-### 9.4 012-streamlit-admin
+### 9.5 013-streamlit-admin
 
 实现 Streamlit 管理台。
 
-### 9.5 901-docker-compose-deployment
+### 9.6 901-docker-compose-deployment
 
 实现本地 Docker Compose 部署。
 
-### 9.6 902-test-dataset
+### 9.7 902-test-dataset
 
 构造不含敏感资料的小样本测试集。
 
@@ -876,10 +886,11 @@ Hermes 不建议作为第一阶段主开发工具。
 ### 阶段二：知识资产和检索
 
 ```text
-009-evidence-chain
-010-curated-project-assets
-011-search-service
-012-streamlit-admin
+009-quality-report-summary
+010-evidence-chain
+011-curated-project-assets
+012-search-service
+013-streamlit-admin
 ```
 
 目标：
