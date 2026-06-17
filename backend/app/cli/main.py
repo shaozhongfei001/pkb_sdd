@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -24,6 +25,7 @@ from app.services.parse_registry import (
     ParseRegistryService,
 )
 from app.services.parse_quality_checker import ParseQualityCheckerService
+from app.services.parse_quality_report_summarizer import ParseQualityReportSummarizerService
 from app.services.parser_router import ParserRouterService
 
 app = typer.Typer(help="Personal KB CLI. Implement commands according to specs.")
@@ -624,6 +626,93 @@ def check_parse_quality(
         console.print(f"Parse quality report: {report.report_path}")
 
     if fail_on_issue and report.summary["issue_count"] > 0:
+        raise typer.Exit(code=2)
+
+
+@app.command("summarize-parse-quality")
+def summarize_parse_quality(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    input_path: Path | None = typer.Option(
+        None,
+        "--input",
+        help="Path to an existing 008 parse_quality_report.json file.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Optional summary output path.",
+    ),
+    output_format: str = typer.Option(
+        "markdown",
+        "--format",
+        help="Summary format: markdown (default) or json.",
+    ),
+    severity: str | None = typer.Option(
+        None,
+        "--severity",
+        help="Filter issues by severity (CRITICAL, ERROR, WARNING, INFO).",
+    ),
+    issue_code: list[str] | None = typer.Option(
+        None,
+        "--issue-code",
+        help="Filter by issue code. Repeatable.",
+    ),
+    parser_name: str | None = typer.Option(
+        None,
+        "--parser-name",
+        help="Filter by parser name (markitdown or mineru).",
+    ),
+    top: int = typer.Option(
+        20,
+        "--top",
+        help="Maximum number of sample issues to include.",
+    ),
+    fail_on_issue: bool = typer.Option(
+        False,
+        "--fail-on-issue",
+        help="Exit with code 2 when filtered issue count is greater than zero.",
+    ),
+) -> None:
+    if top < 1:
+        console.print("ERROR: --top must be >= 1")
+        raise typer.Exit(code=1)
+    if output_format not in {"markdown", "json"}:
+        console.print("ERROR: --format must be markdown or json")
+        raise typer.Exit(code=1)
+
+    config_path = config or DEFAULT_CONFIG_PATH
+    try:
+        app_config = load_config(config_path)
+        service = ParseQualityReportSummarizerService(app_config)
+        result = service.summarize(
+            input_path=input_path,
+            output=output,
+            output_format=output_format,
+            severity=severity,
+            issue_codes=issue_code,
+            parser_name=parser_name,
+            top=top,
+            fail_on_issue=fail_on_issue,
+        )
+    except (FileNotFoundError, ValueError, json.JSONDecodeError, OSError) as exc:
+        console.print(f"ERROR: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"Input report: {result.input_path}")
+    console.print(f"Filtered issues: {result.filtered_issue_count}")
+    console.print(
+        "Noise breakdown: "
+        f"TEST_STALE_PATH={result.noise_breakdown['TEST_STALE_PATH']}, "
+        f"STALE_VAULT_PATH={result.noise_breakdown['STALE_VAULT_PATH']}, "
+        f"REAL_DEFECT={result.noise_breakdown['REAL_DEFECT']}"
+    )
+    console.print(f"Parse quality summary: {result.summary_path}")
+
+    if result.exit_code_hint == 2:
         raise typer.Exit(code=2)
 
 

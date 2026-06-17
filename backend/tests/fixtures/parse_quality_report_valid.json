@@ -1,0 +1,89 @@
+{
+  "report_type": "parse_quality_report",
+  "schema_version": "1.0",
+  "generated_at": "2026-06-16T12:00:00Z",
+  "mode": "check",
+  "scope": {
+    "sha256": null,
+    "content_uid": null,
+    "parser_name": null,
+    "status": null,
+    "limit": null
+  },
+  "summary": {
+    "checked_content_count": 2,
+    "checked_raw_vault_count": 2,
+    "checked_parse_result_count": 2,
+    "checked_artifact_count": 2,
+    "issue_count": 2,
+    "critical_count": 0,
+    "error_count": 1,
+    "warning_count": 1,
+    "info_count": 0
+  },
+  "issue_counts": {
+    "MISSING_RAW_VAULT_OBJECT": 0,
+    "STALE_RAW_VAULT_PATH": 0,
+    "MISSING_PARSED_DIR": 0,
+    "MISSING_PARSED_TEXT": 1,
+    "MISSING_PARSED_METADATA": 0,
+    "MISSING_PARSE_MANIFEST": 0,
+    "INVALID_PARSE_MANIFEST_JSON": 0,
+    "MANIFEST_REQUIRED_FIELD_MISSING": 0,
+    "MANIFEST_SHA256_MISMATCH": 0,
+    "MANIFEST_CONTENT_UID_MISMATCH": 0,
+    "MANIFEST_PARSER_NAME_INVALID": 0,
+    "MANIFEST_ADAPTER_VERSION_MISSING": 0,
+    "REGISTRY_ARTIFACT_PATH_MISSING": 0,
+    "REGISTRY_STATUS_FILE_MISMATCH": 0,
+    "REGISTRY_MISSING_MANIFEST_RESULT": 0,
+    "REGISTRY_FAILED_RESULT": 0,
+    "REGISTRY_EMPTY_RESULT": 0,
+    "REGISTRY_SKIPPED_RESULT": 1
+  },
+  "by_parser": {
+    "markitdown": 1,
+    "mineru": 1
+  },
+  "by_status": {
+    "SUCCESS": 1,
+    "SKIPPED": 1
+  },
+  "by_route_type": {
+    "OFFICE": 1
+  },
+  "by_severity": {
+    "ERROR": 1,
+    "WARNING": 1
+  },
+  "issues": [
+    {
+      "issue_code": "MISSING_PARSED_TEXT",
+      "severity": "ERROR",
+      "content_uid": "content-001",
+      "sha256": "abc123",
+      "parser_name": "markitdown",
+      "parser_adapter_version": "1.0.0",
+      "artifact_type": "parsed_text",
+      "path": "/workspace/parsed/by_hash/ab/c1/abc123/parsed_text.md",
+      "message": "parsed_text.md is missing",
+      "evidence": {}
+    },
+    {
+      "issue_code": "REGISTRY_SKIPPED_RESULT",
+      "severity": "WARNING",
+      "content_uid": "content-002",
+      "sha256": "def456",
+      "parser_name": "mineru",
+      "parser_adapter_version": "1.0.0",
+      "artifact_type": null,
+      "path": null,
+      "message": "Registry result is skipped",
+      "evidence": {}
+    }
+  ],
+  "recommendations": [
+    "Review skipped parse result; no automatic action required.",
+    "Re-run parser only after raw vault sample is restored."
+  ]
+}

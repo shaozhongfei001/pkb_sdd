@@ -18,7 +18,8 @@
 | 005 | `specs/005-markitdown-parser/` | DONE | MarkItDown parser adapter |
 | 006 | `specs/006-parse-job-registry/` | DONE | Parse job/result/artifact registry |
 | 007 | `specs/007-mineru-pdf-parser-adapter/` | DONE | MinerU PDF parser adapter |
-| 008 | `specs/008-parse-quality-checker/` | ACTIVE / PLANNED | Parse quality checker |
+| 008 | `specs/008-parse-quality-checker/` | DONE | Parse quality checker |
+| 009 | `specs/009-quality-report-summary/` | DONE | Parse quality report summary |
 
 ---
 
@@ -37,13 +38,26 @@ These directories are early roadmap or stub specs. They are preserved for histor
 
 | Directory | Status | Notes |
 |---|---|---|
-| `specs/008-review-workflow/` | FUTURE STUB / NOT CURRENT | Human review workflow. This is not the current 008 parse quality checker. |
-| `specs/009-evidence-chain/` | FUTURE | Evidence chain |
-| `specs/010-curated-project-assets/` | FUTURE | Curated assets / project cards |
-| `specs/011-search-service/` | FUTURE | Search service |
-| `specs/012-streamlit-admin/` | FUTURE | Streamlit admin UI |
+| `specs/008-review-workflow/` | FUTURE STUB / NOT CURRENT | Human review workflow. This is **not** the completed 008 parse quality checker. Do not start unless this index explicitly sets it ACTIVE. |
+| `specs/010-evidence-chain/` | FUTURE | Evidence chain (renumbered from former `009-evidence-chain`) |
+| `specs/011-curated-project-assets/` | FUTURE | Curated assets / project cards (renumbered from former `010-curated-project-assets`) |
+| `specs/012-search-service/` | FUTURE | Search service (renumbered from former `011-search-service`) |
+| `specs/013-streamlit-admin/` | FUTURE | Streamlit admin UI (renumbered from former `012-streamlit-admin`) |
 | `specs/901-docker-compose-deployment/` | SUPPORT / FUTURE | Deployment support |
 | `specs/902-test-dataset/` | SUPPORT / FUTURE | Test dataset support |
+
+### 3.1 Future Spec Renumber Note (2026-06)
+
+To avoid two `009` semantics coexisting, former future stubs were renumbered:
+
+```text
+009-evidence-chain        -> 010-evidence-chain
+010-curated-project-assets -> 011-curated-project-assets
+011-search-service        -> 012-search-service
+012-streamlit-admin       -> 013-streamlit-admin
+```
+
+`009` is the completed `009-quality-report-summary` spec.
 
 ---
 
@@ -61,55 +75,52 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-The current active/planned phase is:
+**No spec is currently ACTIVE.**
 
-`008 Parse Quality Checker`
+The completed chain runs through phase **009**. Do not start `010-evidence-chain`, `008-review-workflow`, or any other future stub until this index explicitly sets a new ACTIVE phase.
 
-Spec directory:
+When starting new work:
 
-`specs/008-parse-quality-checker/`
+1. Read this file.
+2. Confirm which directory is marked ACTIVE (none at handoff time).
+3. Do not infer active spec from directory numbering alone.
 
-Branch:
+### 4.3 Completed 009 Boundary (Reference)
 
-`feature/008-parse-quality-checker`
+`009-quality-report-summary` is a completed read-only report consumption phase.
 
-### 4.3 008 Boundary
+It may:
 
-`008-parse-quality-checker` is a read-only quality checking phase.
-
-It may check:
-
-- `raw_vault` original file existence
-- `parsed_text.md` existence
-- `parsed_metadata.json` existence
-- `parse_manifest.json` existence
-- manifest / registry consistency
-- registry / parsed artifact consistency
-- stale `vault_path`, especially `/tmp/...` paths
-- `MISSING_MANIFEST`, `EMPTY`, `FAILED`, and skipped parse result aggregation
-- parser name / parser adapter version validity
+- read `config/app.yaml` for `reports_root` and default input discovery
+- read an existing 008 `parse_quality_report.json` file (`--input` or latest under `reports_root`)
+- write a Markdown or JSON summary file under `reports_root` or `--output`
+- classify issues in the input report into noise buckets (`TEST_STALE_PATH`, `STALE_VAULT_PATH`, `REAL_DEFECT`)
+- filter and aggregate issue data already present in the 008 report
 
 It must not:
 
-- re-parse files
-- call MarkItDown
-- call MinerU / `magic-pdf`
-- modify `raw_vault`
-- modify `parsed`
-- modify registry tables
-- delete files
-- move files
-- rename files
-- write curated assets
-- write vectors / embeddings
-- create project cards
+- read `raw_vault`
+- read `parsed`
+- connect to MySQL
+- write DB records
+- call MarkItDown, MinerU, or `magic-pdf`
+- invoke `check-parse-quality` to rescan the project
+- repair, reparse, delete, move, or rename files
+- clean pytest dirty DB records
+- write curated assets, vectors, embeddings, or project cards
 - use LLM semantic judgment
 
-Default output should be a report under `reports_root`, for example:
+Default output should be a summary under `reports_root`, for example:
 
-`parse_quality_report_{UTC}.json`
+`parse_quality_summary_{UTC}.md`
 
-If a future design proposes DB writes, the workflow must STOP and enter DB Review first.
+If a future design proposes DB writes or filesystem reads beyond the 008 JSON report, the workflow must STOP and enter TL + DB Review first.
+
+009 must not be re-opened for implementation unless a new defect spec is explicitly approved.
+
+### 4.4 Completed 008 Boundary (Reference)
+
+`008-parse-quality-checker` remains a completed read-only checker. It must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
 ---
 
@@ -147,4 +158,4 @@ But real `magic-pdf` / MinerU E2E was not completed because:
 2. The available COPIED PDF database sample pointed to a stale `/tmp/p5_reqa_*` vault path.
 3. There was no COPIED non-PDF live sample for CLI ROUTE_MISMATCH validation.
 
-This caveat does not change the 007 implementation contract, but 008 should detect stale vault path and parsed/registry consistency issues.
+This caveat does not change the 007 implementation contract. 008 detects stale vault path and parsed/registry consistency issues in its JSON report; 009 may summarize those findings but must not fix them.
