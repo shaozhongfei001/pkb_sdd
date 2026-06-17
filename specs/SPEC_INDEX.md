@@ -19,7 +19,7 @@
 | 006 | `specs/006-parse-job-registry/` | DONE | Parse job/result/artifact registry |
 | 007 | `specs/007-mineru-pdf-parser-adapter/` | DONE | MinerU PDF parser adapter |
 | 008 | `specs/008-parse-quality-checker/` | DONE | Parse quality checker |
-| 009 | `specs/009-quality-report-summary/` | ACTIVE / PLANNED | Parse quality report summary |
+| 009 | `specs/009-quality-report-summary/` | DONE | Parse quality report summary |
 
 ---
 
@@ -57,7 +57,7 @@ To avoid two `009` semantics coexisting, former future stubs were renumbered:
 012-streamlit-admin       -> 013-streamlit-admin
 ```
 
-`009` is reserved for the active `009-quality-report-summary` spec.
+`009` is the completed `009-quality-report-summary` spec.
 
 ---
 
@@ -75,21 +75,19 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-The current active/planned phase is:
+**No spec is currently ACTIVE.**
 
-`009 Parse Quality Report Summary`
+The completed chain runs through phase **009**. Do not start `010-evidence-chain`, `008-review-workflow`, or any other future stub until this index explicitly sets a new ACTIVE phase.
 
-Spec directory:
+When starting new work:
 
-`specs/009-quality-report-summary/`
+1. Read this file.
+2. Confirm which directory is marked ACTIVE (none at handoff time).
+3. Do not infer active spec from directory numbering alone.
 
-Branch:
+### 4.3 Completed 009 Boundary (Reference)
 
-`feature/009-quality-report-summary`
-
-### 4.3 009 Boundary
-
-`009-quality-report-summary` is a read-only report consumption phase.
+`009-quality-report-summary` is a completed read-only report consumption phase.
 
 It may:
 
@@ -117,6 +115,8 @@ Default output should be a summary under `reports_root`, for example:
 `parse_quality_summary_{UTC}.md`
 
 If a future design proposes DB writes or filesystem reads beyond the 008 JSON report, the workflow must STOP and enter TL + DB Review first.
+
+009 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
 ### 4.4 Completed 008 Boundary (Reference)
 
