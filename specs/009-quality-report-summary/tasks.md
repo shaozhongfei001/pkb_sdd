@@ -3,8 +3,8 @@
 > Project: `pkb_sdd`  
 > Spec: `specs/009-quality-report-summary/`  
 > Phase model: P1–P8  
-> Current phase: `P1 Tech Lead Plan`  
-> Current implementation state: `NOT STARTED`
+> Current phase: `P3 Implementation Gate — COMPLETE (awaiting P4 approval)`  
+> Current implementation state: `NOT STARTED (P4 blocked)`
 
 ---
 
@@ -94,8 +94,8 @@ P1 checklist:
 [x] Mark 009 ACTIVE in SPEC_INDEX
 [x] Confirm 008-review-workflow remains FUTURE STUB
 [x] Renumber future stubs via git mv
-[ ] User P1 review approval
-[ ] STOP
+[x] User P1 review approval (commit e1cfac3)
+[x] STOP
 ```
 
 ---
@@ -132,11 +132,22 @@ Exit gate:
 P2-GATE: DB Review exemption documented; no schema change.
 ```
 
-**Status:** BLOCKED until P1 approved.
+**Status:** **COMPLETE** — see `p2_p3_review.md` §2.
+
+P2 checklist:
+
+```text
+[x] Confirm no ORM / session usage in design
+[x] Confirm input contract matches 008 report schema
+[x] Confirm 18 issue_codes list matches 008 ISSUE_CODES
+[x] Confirm noise classification rules use issue fields only
+[x] Confirm reports_root-only config access at runtime
+[x] Produce DB Review exemption note
+```
 
 ---
 
-## 4. P3 — Implementation Gate (Not Started)
+## 4. P3 — Implementation Gate
 
 Owner:
 
@@ -167,7 +178,24 @@ Exit gate:
 P3-GATE: Dev receives whitelist; no-go list explicit.
 ```
 
-**Status:** BLOCKED until P1 approved and P2 complete.
+P3 checklist:
+
+```text
+[x] Finalize service file path and class API
+[x] Finalize CLI args and exit codes
+[x] Finalize Markdown and JSON output schemas
+[x] Finalize ISSUE_CODES duplication strategy
+[x] Finalize test file and fixture strategy
+[x] Publish Dev Agent whitelist and blacklist in p2_p3_review.md
+```
+
+**Status:** **COMPLETE** — P4 blocked until user confirms.
+
+Deliverable:
+
+```text
+specs/009-quality-report-summary/p2_p3_review.md
+```
 
 ---
 
@@ -295,6 +323,6 @@ merge: feature/009-quality-report-summary into main
 ## 10. Current Action
 
 ```text
-P1 COMPLETE — awaiting user review.
-STOP. Do not proceed to P2.
+P2/P3 COMPLETE — awaiting user approval before P4 Dev Implementation.
+STOP. Do not write backend/** until P4 explicitly approved.
 ```
