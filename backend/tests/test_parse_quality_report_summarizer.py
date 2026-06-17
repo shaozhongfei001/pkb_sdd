@@ -399,3 +399,193 @@ def test_validate_input_report_requires_scope_keys():
     payload["scope"] = {"sha256": None}
     with pytest.raises(ValueError, match="scope missing key"):
         validate_input_report(payload)
+
+
+# --- P5 QA supplemental negative / contract tests ---
+
+
+def test_invalid_schema_version_rejected(summarizer_env):
+    config, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_valid.json")
+    payload["schema_version"] = "2.0"
+    input_path = _write_input_report(reports_root, "bad_schema.json", payload)
+    service = ParseQualityReportSummarizerService(config)
+    with pytest.raises(ValueError, match="schema_version"):
+        service.summarize(input_path=input_path)
+
+
+def test_unknown_issue_counts_key_rejected(summarizer_env):
+    config, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_valid.json")
+    payload["issue_counts"]["UNKNOWN_CODE"] = 1
+    input_path = _write_input_report(reports_root, "unknown_key.json", payload)
+    service = ParseQualityReportSummarizerService(config)
+    with pytest.raises(ValueError, match="unknown keys"):
+        service.summarize(input_path=input_path)
+
+
+def test_malformed_json_rejected(summarizer_env):
+    config, reports_root = summarizer_env
+    input_path = reports_root / "broken.json"
+    input_path.write_text("{not-json", encoding="utf-8")
+    service = ParseQualityReportSummarizerService(config)
+    with pytest.raises(json.JSONDecodeError):
+        service.summarize(input_path=input_path)
+
+
+def test_missing_input_file_rejected(summarizer_env):
+    config, reports_root = summarizer_env
+    service = ParseQualityReportSummarizerService(config)
+    with pytest.raises(FileNotFoundError, match="Input report not found"):
+        service.summarize(input_path=reports_root / "missing.json")
+
+
+def test_parser_name_filter(summarizer_env):
+    config, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_valid.json")
+    input_path = _write_input_report(
+        reports_root, "parse_quality_report_20260616T120000Z.json", payload
+    )
+    service = ParseQualityReportSummarizerService(config)
+    result = service.summarize(
+        input_path=input_path,
+        parser_name="markitdown",
+        output_format="json",
+    )
+    data = json.loads(result.summary_path.read_text(encoding="utf-8"))
+    assert result.filtered_issue_count == 1
+    assert all(
+        issue.get("parser_name") == "markitdown" for issue in data["sample_issues"]
+    )
+
+
+def test_top_truncation(summarizer_env):
+    config, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_valid.json")
+    payload["issues"] = [
+        {
+            "issue_code": "MISSING_PARSED_TEXT",
+            "severity": "ERROR",
+            "content_uid": f"content-{index}",
+            "sha256": f"sha{index}",
+            "parser_name": "markitdown",
+            "parser_adapter_version": "1.0.0",
+            "artifact_type": "parsed_text",
+            "path": f"/workspace/parsed/{index}/parsed_text.md",
+            "message": "missing",
+            "evidence": {},
+        }
+        for index in range(10)
+    ]
+    payload["summary"]["issue_count"] = 10
+    payload["issue_counts"]["MISSING_PARSED_TEXT"] = 10
+    input_path = _write_input_report(
+        reports_root, "parse_quality_report_20260616T150000Z.json", payload
+    )
+    service = ParseQualityReportSummarizerService(config)
+    result = service.summarize(input_path=input_path, top=5, output_format="json")
+    data = json.loads(result.summary_path.read_text(encoding="utf-8"))
+    assert len(data["sample_issues"]) == 5
+
+
+def test_classification_priority_permission_over_stale():
+    issue = {
+        "issue_code": "STALE_RAW_VAULT_PATH",
+        "path": "/tmp/p5_reqa_vault/original.bin",
+        "evidence": {
+            "error": "PermissionError",
+            "path": "/tmp/pytest-of-root/test0/file",
+        },
+    }
+    assert classify_noise_bucket(issue) == "TEST_STALE_PATH"
+
+
+def test_issue_counts_unchanged_when_filtered(summarizer_env):
+    config, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_valid.json")
+    input_path = _write_input_report(
+        reports_root, "parse_quality_report_20260616T120000Z.json", payload
+    )
+    service = ParseQualityReportSummarizerService(config)
+    result = service.summarize(
+        input_path=input_path,
+        severity="ERROR",
+        output_format="json",
+    )
+    data = json.loads(result.summary_path.read_text(encoding="utf-8"))
+    assert data["issue_counts"] == payload["issue_counts"]
+    assert result.filtered_issue_count == 1
+
+
+def test_only_summary_output_written(summarizer_env):
+    config, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_valid.json")
+    input_path = _write_input_report(
+        reports_root, "parse_quality_report_20260616T120000Z.json", payload
+    )
+    before = {path.name for path in reports_root.iterdir()}
+    service = ParseQualityReportSummarizerService(config)
+    result = service.summarize(
+        input_path=input_path,
+        output=reports_root / "explicit_summary.md",
+    )
+    after = {path.name for path in reports_root.iterdir()}
+    assert after - before == {"explicit_summary.md"}
+    assert input_path.name in after
+    assert result.summary_path.name == "explicit_summary.md"
+
+
+def test_cli_invalid_issue_code_exit_1(summarizer_env, tmp_path: Path):
+    _, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_valid.json")
+    input_path = _write_input_report(
+        reports_root, "parse_quality_report_20260616T120000Z.json", payload
+    )
+    config_path = tmp_path / "app.yaml"
+    config_path.write_text(
+        f"""
+app:
+  pipeline_version: v1.1
+storage:
+  source_registry_root: {tmp_path / "source_registry"}
+  raw_vault_root: {tmp_path / "raw_vault"}
+  parsed_root: {tmp_path / "parsed"}
+  curated_root: {tmp_path / "curated"}
+  quarantine_root: {tmp_path / "quarantine"}
+  reports_root: {reports_root}
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  database: personal_kb
+  username: personal_kb
+  password: test
+raw:
+  original_files_readonly: true
+  copy_unique_content_to_vault: true
+""".strip(),
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(
+        app,
+        [
+            "summarize-parse-quality",
+            "--config",
+            str(config_path),
+            "--input",
+            str(input_path),
+            "--issue-code",
+            "NOT_A_REAL_CODE",
+        ],
+    )
+    assert result.exit_code == 1, result.output
+
+
+def test_fail_on_issue_zero_after_filter_exit_0(summarizer_env):
+    config, reports_root = summarizer_env
+    payload = _load_fixture("parse_quality_report_empty_issues.json")
+    input_path = _write_input_report(
+        reports_root, "parse_quality_report_20260616T140000Z.json", payload
+    )
+    service = ParseQualityReportSummarizerService(config)
+    result = service.summarize(input_path=input_path, fail_on_issue=True)
+    assert result.exit_code_hint == 0
