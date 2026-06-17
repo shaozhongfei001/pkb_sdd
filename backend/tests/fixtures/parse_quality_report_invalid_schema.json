@@ -1,0 +1,15 @@
+{
+  "report_type": "wrong_type",
+  "schema_version": "1.0",
+  "generated_at": "2026-06-16T15:00:00Z",
+  "mode": "check",
+  "scope": {},
+  "summary": {},
+  "issue_counts": {},
+  "by_parser": {},
+  "by_status": {},
+  "by_route_type": {},
+  "by_severity": {},
+  "issues": [],
+  "recommendations": []
+}

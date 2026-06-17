@@ -1,0 +1,50 @@
+{
+  "report_type": "parse_quality_report",
+  "schema_version": "1.0",
+  "generated_at": "2026-06-16T14:00:00Z",
+  "mode": "check",
+  "scope": {
+    "sha256": null,
+    "content_uid": null,
+    "parser_name": null,
+    "status": null,
+    "limit": null
+  },
+  "summary": {
+    "checked_content_count": 0,
+    "checked_raw_vault_count": 0,
+    "checked_parse_result_count": 0,
+    "checked_artifact_count": 0,
+    "issue_count": 0,
+    "critical_count": 0,
+    "error_count": 0,
+    "warning_count": 0,
+    "info_count": 0
+  },
+  "issue_counts": {
+    "MISSING_RAW_VAULT_OBJECT": 0,
+    "STALE_RAW_VAULT_PATH": 0,
+    "MISSING_PARSED_DIR": 0,
+    "MISSING_PARSED_TEXT": 0,
+    "MISSING_PARSED_METADATA": 0,
+    "MISSING_PARSE_MANIFEST": 0,
+    "INVALID_PARSE_MANIFEST_JSON": 0,
+    "MANIFEST_REQUIRED_FIELD_MISSING": 0,
+    "MANIFEST_SHA256_MISMATCH": 0,
+    "MANIFEST_CONTENT_UID_MISMATCH": 0,
+    "MANIFEST_PARSER_NAME_INVALID": 0,
+    "MANIFEST_ADAPTER_VERSION_MISSING": 0,
+    "REGISTRY_ARTIFACT_PATH_MISSING": 0,
+    "REGISTRY_STATUS_FILE_MISMATCH": 0,
+    "REGISTRY_MISSING_MANIFEST_RESULT": 0,
+    "REGISTRY_FAILED_RESULT": 0,
+    "REGISTRY_EMPTY_RESULT": 0,
+    "REGISTRY_SKIPPED_RESULT": 0
+  },
+  "by_parser": {},
+  "by_status": {},
+  "by_route_type": {},
+  "by_severity": {},
+  "issues": [],
+  "recommendations": []
+}
