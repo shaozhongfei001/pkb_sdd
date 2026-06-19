@@ -20,7 +20,7 @@
 | 007 | `specs/007-mineru-pdf-parser-adapter/` | DONE | MinerU PDF parser adapter |
 | 008 | `specs/008-parse-quality-checker/` | DONE | Parse quality checker |
 | 009 | `specs/009-quality-report-summary/` | DONE | Parse quality report summary |
-| 010 | `specs/010-evidence-chain/` | ACTIVE / PLANNED | Evidence chain |
+| 010 | `specs/010-evidence-chain/` | DONE | Evidence chain (chunk + evidence) |
 
 ---
 
@@ -75,51 +75,51 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-The current active/planned phase is:
+**No spec is currently ACTIVE.**
 
-`010 Evidence Chain`
+The most recently completed phase is:
 
-Spec directory:
+`010 Evidence Chain` — `specs/010-evidence-chain/` — **DONE**
 
-`specs/010-evidence-chain/`
+To start new work, read this index and run an explicit Active Spec Selection Review. Do not infer the active spec from directory numbering alone.
 
-Branch:
-
-`feature/010-evidence-chain`
-
-When starting work on 010, read this section first. Do not infer active spec from directory numbering alone.
-
-### 4.3 010 Boundary (Active — Planned Implementation)
+### 4.3 Completed 010 Boundary (Reference)
 
 `010-evidence-chain` builds chunk and evidence metadata from parsed artifacts.
 
-It may (P4+, after P2 DB Review PASS):
+It may:
 
 - read `config/app.yaml` (`parsed_root`, `pipeline_version`, mysql for sessions)
 - read `parsed_text.md`, `parsed_metadata.json`, `parse_manifest.json` (**read-only**)
 - SELECT from `kb_document`, `kb_parse_result`, `kb_file_content`, and related registry tables
-- INSERT/UPSERT `kb_document_chunk` and `kb_evidence` with idempotent keys (P2 must confirm)
+- INSERT/UPSERT `kb_document_chunk` and `kb_evidence` with deterministic idempotent UIDs
+- write optional JSON build report (`--output`)
 
 It must not:
 
 - read `raw_vault` binary objects (`original.bin`) for text extraction
 - modify parsed artifacts or original user files
-- call MarkItDown, MinerU, or `magic-pdf`
+- call MarkItDown, MinerU, or `magic-pdf` at runtime
 - reparse, repair, or auto-fix 008/009 quality findings
-- write `curated/`, project cards, vectors, or embeddings
-- implement review workflow (`kb_review_item`)
-- use LLM chunking or semantic splitting in MVP
-- introduce schema migration without P2 DB Review and migration script
+- write parse registry during `build-evidence-chain`
+- write `curated/`, project cards, vectors, embeddings, or `kb_review_item`
+- use LLM chunking or semantic splitting
+- introduce schema migration without a separate migration spec
 
-P2 is **mandatory** before P4:
+CLI:
 
-```text
-Verify kb_document_chunk / kb_evidence in init SQL
-Verify ORM models and idempotency keys
-If schema/ORM insufficient -> STOP; migration gate before P4
+```bash
+PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
+  --config config/app.yaml \
+  --content-uid <uid> \
+  --sha256 <hash> \
+  --limit <n> \
+  --dry-run \
+  --force \
+  --output /path/to/evidence_build_report.json
 ```
 
-P1 does **not** pre-judge migration necessity.
+010 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
 ### 4.4 Completed 009 Boundary (Reference)
 
