@@ -3,8 +3,8 @@
 > Project: `pkb_sdd`  
 > Spec: `specs/010-evidence-chain/`  
 > Phase model: P1–P8  
-> Current phase: `P1 Tech Lead Plan`  
-> Current implementation state: `NOT STARTED`
+> Current phase: `P3 Implementation Gate — COMPLETE (awaiting P4 approval)`  
+> Current implementation state: `NOT STARTED (P4 blocked)`
 
 ---
 
@@ -119,26 +119,40 @@ P2-GATE: DB Review PASS required before P3/P4.
 If FAIL -> migration spec + STOP.
 ```
 
-**Status:** BLOCKED until P1 approved.
+**Status:** **COMPLETE** — see `p2_db_review.md`.
 
 ---
 
-## 4. P3 — Implementation Gate (Not Started)
+## 4. P3 — Implementation Gate
 
 Owner: Tech Lead Agent
 
-Tasks:
+Goal:
 
 ```text
-P3-T001 Finalize EvidenceChainService API
-P3-T002 Finalize chunk strategy per parser_name
-P3-T003 Finalize CLI build-evidence-chain contract
-P3-T004 Finalize Dev whitelist / blacklist
-P3-T005 Finalize test fixture strategy
-P3-T006 Publish Dev Agent prompt
+Publish P4 Dev whitelist, CLI/DB/ORM contracts, test plan.
 ```
 
-**Status:** BLOCKED until P2 PASS.
+Deliverable:
+
+```text
+specs/010-evidence-chain/p3_implementation_gate.md
+```
+
+P3 checklist:
+
+```text
+[x] P4 file whitelist
+[x] P4 forbidden list
+[x] CLI build-evidence-chain contract
+[x] DB write contract
+[x] ORM contract
+[x] Chunk/evidence MVP strategy
+[x] P4/P5 test plan
+[x] Dev Agent handoff template
+```
+
+**Status:** **COMPLETE** — P4 blocked until user confirms.
 
 ---
 
@@ -197,6 +211,6 @@ merge: feature/010-evidence-chain into main
 ## 10. Current Action
 
 ```text
-P1 COMPLETE — awaiting user review.
-STOP. Do not proceed to P2.
+P3 COMPLETE — awaiting user approval before P4 Dev Implementation.
+STOP. Do not write backend/** until P4 explicitly approved.
 ```
