@@ -1,0 +1,6 @@
+project_code: DEMO-2024
+project_name: Demo Project
+description: Rule-template curated project card for tests.
+documents:
+  - content_uid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    document_uid: "doc_demo_001"
