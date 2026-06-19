@@ -603,11 +603,11 @@ parser.log
 
 > 权威索引见 `specs/SPEC_INDEX.md`。目录编号以 SPEC_INDEX 为准。
 
-### 9.1 009-quality-report-summary（当前 ACTIVE）
+### 9.1 009-quality-report-summary（DONE）
 
 只读消费 008 `parse_quality_report.json`，输出 Markdown / JSON 摘要；不连 MySQL、不读 raw_vault / parsed、不修复。
 
-### 9.2 010-evidence-chain
+### 9.2 010-evidence-chain（当前 ACTIVE）
 
 实现证据链，包括：
 
