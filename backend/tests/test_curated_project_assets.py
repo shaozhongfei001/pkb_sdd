@@ -808,3 +808,68 @@ def test_manifest_project_code_mismatch_raises(workspace: Path) -> None:
             project_name="Demo Project",
             manifest_path=DEMO_MANIFEST,
         )
+
+
+def test_limit_truncates_manifest_documents(workspace: Path) -> None:
+    content_uid_a = "a" * 64
+    content_uid_b = "b" * 64
+    documents = {
+        "doc_a": _document(document_uid="doc_a", content_uid=content_uid_a),
+        "doc_b": _document(document_uid="doc_b", content_uid=content_uid_b),
+    }
+    manifest_path = workspace / "multi.manifest.yaml.fixture"
+    manifest_path.write_text(
+        f"""
+project_code: MULTI-2024
+project_name: Multi Doc
+documents:
+  - content_uid: "{content_uid_a}"
+    document_uid: doc_a
+  - content_uid: "{content_uid_b}"
+    document_uid: doc_b
+""".strip(),
+        encoding="utf-8",
+    )
+    service, factory = _service(workspace, documents=documents, evidence={})
+
+    result = service.build(
+        project_code="MULTI-2024",
+        manifest_path=manifest_path,
+        limit=1,
+        force=True,
+    )
+
+    assert result.documents_mapped == 1
+    assert len(factory.sessions[-1].project_documents) == 1
+
+
+def test_only_three_markdown_files_written(workspace: Path) -> None:
+    documents, evidence = _demo_seed()
+    service, _factory = _service(workspace, documents=documents, evidence=evidence)
+
+    service.build(
+        project_code="DEMO-2024",
+        project_name="Demo Project",
+        manifest_path=DEMO_MANIFEST,
+        force=True,
+    )
+
+    project_dir = _project_dir(workspace, "DEMO-2024")
+    md_files = sorted(path.name for path in project_dir.glob("*.md"))
+    assert md_files == sorted(ASSET_FILES.values())
+
+
+def test_cli_content_uid_mapping_method(workspace: Path) -> None:
+    content_uid = "e" * 64
+    document_uid = "doc_cli_001"
+    documents = {document_uid: _document(document_uid=document_uid, content_uid=content_uid)}
+    service, factory = _service(workspace, documents=documents, evidence={})
+
+    service.build(
+        project_code="CLI-PROJ",
+        project_name="CLI Project",
+        content_uid=content_uid,
+        force=True,
+    )
+
+    assert factory.sessions[-1].project_documents[0].mapping_method == "CLI"
