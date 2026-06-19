@@ -40,7 +40,6 @@ These directories are early roadmap or stub specs. They are preserved for histor
 | Directory | Status | Notes |
 |---|---|---|
 | `specs/008-review-workflow/` | FUTURE STUB / NOT CURRENT | Human review workflow. This is **not** the completed 008 parse quality checker. Do not start unless this index explicitly sets it ACTIVE. |
-| `specs/011-curated-project-assets/` | FUTURE | Curated assets / project cards (renumbered from former `010-curated-project-assets`) |
 | `specs/012-search-service/` | FUTURE | Search service (renumbered from former `011-search-service`) |
 | `specs/013-streamlit-admin/` | FUTURE | Streamlit admin UI (renumbered from former `012-streamlit-admin`) |
 | `specs/901-docker-compose-deployment/` | SUPPORT / FUTURE | Deployment support |
@@ -75,15 +74,74 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-**No spec is currently ACTIVE.**
+The current active/planned phase is:
+
+`011 Curated Project Assets`
+
+Spec directory:
+
+`specs/011-curated-project-assets/`
+
+Branch:
+
+`feature/011-curated-project-assets`
+
+When starting work on 011, read this section first. Do not infer active spec from directory numbering alone.
 
 The most recently completed phase is:
 
 `010 Evidence Chain` — `specs/010-evidence-chain/` — **DONE**
 
-To start new work, read this index and run an explicit Active Spec Selection Review. Do not infer the active spec from directory numbering alone.
+### 4.3 011 Boundary (Active — Planned Implementation)
 
-### 4.3 Completed 010 Boundary (Reference)
+`011-curated-project-assets` builds rule/template curated project files from 010 evidence and registry metadata.
+
+It may (P4+, after P2 DB Review PASS):
+
+- read `config/app.yaml` (`curated_root`, `pipeline_version`, mysql for sessions)
+- read optional project manifest YAML (`--manifest` / `config/projects/*.yaml`)
+- SELECT from `kb_document`, `kb_document_chunk`, `kb_evidence`, `kb_file_content`, `kb_parse_result`, and related registry tables
+- INSERT/UPSERT `kb_project`, `kb_project_document`, and `kb_curated_asset` with idempotent keys (P2 must confirm)
+- write Markdown files under `{curated_root}/projects/{project_code}/` (MVP: `00_project_card.md`, `10_evidence_index.md`, `source_documents.md`)
+- write optional JSON build report (`--output`)
+
+It must not:
+
+- read `raw_vault` binary objects (`original.bin`) for text extraction
+- modify parsed artifacts or original user files
+- call MarkItDown, MinerU, or `magic-pdf` at runtime
+- reparse, repair, or auto-fix 008/009 quality findings
+- write `kb_document_chunk`, `kb_evidence`, parse registry, `kb_review_item`, or `kb_embedding_ref`
+- use LLM distillation, semantic summarization, or embedding generation
+- implement search service (012) or Streamlit / admin UI (013)
+- introduce schema migration without P2 DB Review and migration script
+
+P2 is **mandatory** before P4:
+
+```text
+Verify kb_project / kb_project_document / kb_curated_asset in init SQL
+Verify ORM models and idempotency keys
+Verify curated_root in AppConfig
+If schema/ORM insufficient -> STOP; migration gate before P4
+```
+
+P1 does **not** pre-judge migration necessity.
+
+Proposed CLI (P4):
+
+```bash
+PYTHONPATH=backend python -m app.cli.main build-curated-project \
+  --config config/app.yaml \
+  --project-code <code> \
+  --manifest config/projects/<code>.yaml \
+  --content-uid <uid> \
+  --limit <n> \
+  --dry-run \
+  --force \
+  --output /path/to/curated_build_report.json
+```
+
+### 4.4 Completed 010 Boundary (Reference)
 
 `010-evidence-chain` builds chunk and evidence metadata from parsed artifacts.
 
@@ -121,7 +179,7 @@ PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
 
 010 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.4 Completed 009 Boundary (Reference)
+### 4.5 Completed 009 Boundary (Reference)
 
 `009-quality-report-summary` is a completed read-only report consumption phase.
 
@@ -154,7 +212,7 @@ If a future design proposes DB writes or filesystem reads beyond the 008 JSON re
 
 009 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.5 Completed 008 Boundary (Reference)
+### 4.6 Completed 008 Boundary (Reference)
 
 `008-parse-quality-checker` remains a completed read-only checker. It must not be re-opened for implementation unless a new defect spec is explicitly approved.
 

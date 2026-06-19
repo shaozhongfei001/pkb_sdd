@@ -617,17 +617,23 @@ parser.log
 
 只读 parsed + SELECT registry；不调用 parser、不写 curated/embedding/review。
 
-### 9.3 011-curated-project-assets
+### 9.3 011-curated-project-assets（ACTIVE / PLANNED）
 
-实现项目化知识资产：
+从 010 evidence + registry 元数据生成项目化知识资产（**规则/模板 MVP**，非 LLM 蒸馏）：
 
 ```text
-project_card
-source_documents
-evidence_index
-reusable_assets
-lessons_learned
+curated/projects/{project_code}/
+  00_project_card.md       # MVP
+  10_evidence_index.md     # MVP
+  source_documents.md      # MVP
+  01_background.md …       # 后续阶段
 ```
+
+写入 `kb_project` / `kb_project_document` / `kb_curated_asset`；产物必须引用 `evidence_uid` / `content_uid` / `document_uid`。
+
+**不做：** LLM 蒸馏、embedding、review workflow、parser 调用、search-service、Streamlit。
+
+Branch: `feature/011-curated-project-assets` · 权威边界见 `specs/SPEC_INDEX.md` §4.3。
 
 ### 9.4 012-search-service
 
