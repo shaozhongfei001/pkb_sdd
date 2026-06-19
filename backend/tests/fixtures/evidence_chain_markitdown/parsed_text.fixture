@@ -1,0 +1,11 @@
+# Introduction
+
+This is a sample document for evidence chain tests.
+
+## First Section
+
+First section body with enough text for chunking.
+
+## Second Section
+
+Second section body includes 中文内容 for UTF-8 coverage.

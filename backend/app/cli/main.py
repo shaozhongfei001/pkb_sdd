@@ -26,6 +26,7 @@ from app.services.parse_registry import (
 )
 from app.services.parse_quality_checker import ParseQualityCheckerService
 from app.services.parse_quality_report_summarizer import ParseQualityReportSummarizerService
+from app.services.evidence_chain import EvidenceChainService
 from app.services.parser_router import ParserRouterService
 
 app = typer.Typer(help="Personal KB CLI. Implement commands according to specs.")
@@ -714,6 +715,84 @@ def summarize_parse_quality(
 
     if result.exit_code_hint == 2:
         raise typer.Exit(code=2)
+
+
+@app.command("build-evidence-chain")
+def build_evidence_chain(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Process only the specified content uid.",
+    ),
+    sha256: str | None = typer.Option(
+        None,
+        "--sha256",
+        help="Process only the specified content sha256.",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of documents/candidates to process.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Plan evidence chain without writing to MySQL.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Rebuild even when evidence chunks already exist.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Optional JSON build report output path.",
+    ),
+) -> None:
+    """Build evidence chain records from parsed artifacts.
+
+    Reads parsed_text.md / metadata / manifest (read-only).
+    Writes kb_document_chunk and kb_evidence only.
+    Does not call parsers, read raw_vault binaries, or repair quality issues.
+    Use --dry-run for zero DB writes.
+    """
+    if limit is not None and limit < 1:
+        console.print("ERROR: --limit must be >= 1")
+        raise typer.Exit(code=1)
+
+    config_path = config or DEFAULT_CONFIG_PATH
+    try:
+        app_config = load_config(config_path)
+        service = EvidenceChainService(app_config)
+        result = service.build(
+            content_uid=content_uid,
+            sha256=sha256,
+            limit=limit,
+            dry_run=dry_run,
+            force=force,
+            output=output,
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        console.print(f"ERROR: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"Candidates selected: {result.candidates_selected}")
+    console.print(f"Documents processed: {result.documents_processed}")
+    console.print(f"Documents skipped: {result.documents_skipped}")
+    console.print(f"Chunks planned: {result.chunks_planned}")
+    console.print(f"Chunks upserted: {result.chunks_upserted}")
+    console.print(f"Evidence planned: {result.evidence_planned}")
+    console.print(f"Evidence upserted: {result.evidence_upserted}")
+    console.print(f"Dry run: {dry_run}")
+    console.print(f"Errors: {len(result.errors)}")
+    if result.report_path is not None:
+        console.print(f"Evidence build report: {result.report_path}")
 
 
 @app.command("build-parse-queue")

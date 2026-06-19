@@ -1,0 +1,19 @@
+{
+  "parser_name": "mineru",
+  "parser_profile": "mineru_default_v1",
+  "parser_adapter_version": "test-adapter-v1",
+  "route_type": "PDF_DIGITAL",
+  "pages": [
+    {
+      "page_no": 1,
+      "start_offset": 0,
+      "end_offset": 32,
+      "bbox": [10.0, 20.0, 100.0, 200.0]
+    },
+    {
+      "page_no": 2,
+      "start_offset": 32,
+      "end_offset": 72
+    }
+  ]
+}
