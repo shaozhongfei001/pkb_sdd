@@ -20,6 +20,7 @@
 | 007 | `specs/007-mineru-pdf-parser-adapter/` | DONE | MinerU PDF parser adapter |
 | 008 | `specs/008-parse-quality-checker/` | DONE | Parse quality checker |
 | 009 | `specs/009-quality-report-summary/` | DONE | Parse quality report summary |
+| 010 | `specs/010-evidence-chain/` | DONE | Evidence chain (chunk + evidence) |
 
 ---
 
@@ -39,7 +40,6 @@ These directories are early roadmap or stub specs. They are preserved for histor
 | Directory | Status | Notes |
 |---|---|---|
 | `specs/008-review-workflow/` | FUTURE STUB / NOT CURRENT | Human review workflow. This is **not** the completed 008 parse quality checker. Do not start unless this index explicitly sets it ACTIVE. |
-| `specs/010-evidence-chain/` | FUTURE | Evidence chain (renumbered from former `009-evidence-chain`) |
 | `specs/011-curated-project-assets/` | FUTURE | Curated assets / project cards (renumbered from former `010-curated-project-assets`) |
 | `specs/012-search-service/` | FUTURE | Search service (renumbered from former `011-search-service`) |
 | `specs/013-streamlit-admin/` | FUTURE | Streamlit admin UI (renumbered from former `012-streamlit-admin`) |
@@ -77,15 +77,51 @@ Agents must follow this order when selecting a spec:
 
 **No spec is currently ACTIVE.**
 
-The completed chain runs through phase **009**. Do not start `010-evidence-chain`, `008-review-workflow`, or any other future stub until this index explicitly sets a new ACTIVE phase.
+The most recently completed phase is:
 
-When starting new work:
+`010 Evidence Chain` — `specs/010-evidence-chain/` — **DONE**
 
-1. Read this file.
-2. Confirm which directory is marked ACTIVE (none at handoff time).
-3. Do not infer active spec from directory numbering alone.
+To start new work, read this index and run an explicit Active Spec Selection Review. Do not infer the active spec from directory numbering alone.
 
-### 4.3 Completed 009 Boundary (Reference)
+### 4.3 Completed 010 Boundary (Reference)
+
+`010-evidence-chain` builds chunk and evidence metadata from parsed artifacts.
+
+It may:
+
+- read `config/app.yaml` (`parsed_root`, `pipeline_version`, mysql for sessions)
+- read `parsed_text.md`, `parsed_metadata.json`, `parse_manifest.json` (**read-only**)
+- SELECT from `kb_document`, `kb_parse_result`, `kb_file_content`, and related registry tables
+- INSERT/UPSERT `kb_document_chunk` and `kb_evidence` with deterministic idempotent UIDs
+- write optional JSON build report (`--output`)
+
+It must not:
+
+- read `raw_vault` binary objects (`original.bin`) for text extraction
+- modify parsed artifacts or original user files
+- call MarkItDown, MinerU, or `magic-pdf` at runtime
+- reparse, repair, or auto-fix 008/009 quality findings
+- write parse registry during `build-evidence-chain`
+- write `curated/`, project cards, vectors, embeddings, or `kb_review_item`
+- use LLM chunking or semantic splitting
+- introduce schema migration without a separate migration spec
+
+CLI:
+
+```bash
+PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
+  --config config/app.yaml \
+  --content-uid <uid> \
+  --sha256 <hash> \
+  --limit <n> \
+  --dry-run \
+  --force \
+  --output /path/to/evidence_build_report.json
+```
+
+010 must not be re-opened for implementation unless a new defect spec is explicitly approved.
+
+### 4.4 Completed 009 Boundary (Reference)
 
 `009-quality-report-summary` is a completed read-only report consumption phase.
 
@@ -118,7 +154,7 @@ If a future design proposes DB writes or filesystem reads beyond the 008 JSON re
 
 009 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.4 Completed 008 Boundary (Reference)
+### 4.5 Completed 008 Boundary (Reference)
 
 `008-parse-quality-checker` remains a completed read-only checker. It must not be re-opened for implementation unless a new defect spec is explicitly approved.
 

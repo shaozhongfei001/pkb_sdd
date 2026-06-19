@@ -15,6 +15,10 @@ from app.services.inventory_scanner import InventoryScanner
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_ROOT = PROJECT_ROOT / "backend" / "tests" / "fixtures"
+# Inventory scanner E2E uses only the Chinese-path txt pair. Do not scan all of
+# FIXTURES_ROOT — sibling dirs/files (e.g. 009 parse_quality_report_*.json) are
+# document candidates for other specs and would pollute scan counts.
+INVENTORY_FIXTURES_ROOT = FIXTURES_ROOT / "中文路径"
 DEFAULT_MYSQL_PASSWORD = os.environ.get("PKB_MYSQL_PASSWORD", "mahound")
 
 
@@ -268,16 +272,16 @@ def test_original_files_unchanged(scanner: InventoryScanner, tmp_path: Path) -> 
 
 
 def test_scan_project_fixtures(scanner: InventoryScanner) -> None:
-    if not FIXTURES_ROOT.is_dir():
-        pytest.skip("Project fixtures directory is missing")
+    if not INVENTORY_FIXTURES_ROOT.is_dir():
+        pytest.skip("Inventory scanner fixtures directory is missing")
 
-    prefix = FIXTURES_ROOT.as_posix()
-    fixture_files = list(FIXTURES_ROOT.rglob("*.txt"))
+    prefix = INVENTORY_FIXTURES_ROOT.as_posix()
+    fixture_files = list(INVENTORY_FIXTURES_ROOT.rglob("*.txt"))
     sha_values = [compute_sha256(path) for path in fixture_files]
     unique_sha = list(dict.fromkeys(sha_values))
     _cleanup_scan_paths([prefix], unique_sha)
 
-    result = scanner.scan(FIXTURES_ROOT)
+    result = scanner.scan(INVENTORY_FIXTURES_ROOT)
 
     assert result.scanned_files == 2
     assert result.new_instances == 2
@@ -285,11 +289,11 @@ def test_scan_project_fixtures(scanner: InventoryScanner) -> None:
     assert result.duplicate_instances == 1
     assert result.errors == []
 
-    second = scanner.scan(FIXTURES_ROOT)
+    second = scanner.scan(INVENTORY_FIXTURES_ROOT)
     assert second.new_instances == 0
     assert second.duplicate_instances == 1
 
-    fixture_files = list(FIXTURES_ROOT.rglob("*.txt"))
+    fixture_files = list(INVENTORY_FIXTURES_ROOT.rglob("*.txt"))
     sha_values = [compute_sha256(path) for path in fixture_files]
     unique_sha = list(dict.fromkeys(sha_values))
     _cleanup_scan_paths([prefix], unique_sha)

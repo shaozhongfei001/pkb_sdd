@@ -1,0 +1,11 @@
+{
+  "content_uid": "PLACEHOLDER_CONTENT_UID",
+  "sha256": "PLACEHOLDER_SHA256",
+  "route_type": "OFFICE_DOCX",
+  "parser_name": "markitdown",
+  "parser_adapter_version": "test-adapter-v1",
+  "parsed_text_path": "PLACEHOLDER_PARSED_TEXT",
+  "parsed_metadata_path": "PLACEHOLDER_PARSED_METADATA",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "status": "SUCCESS"
+}

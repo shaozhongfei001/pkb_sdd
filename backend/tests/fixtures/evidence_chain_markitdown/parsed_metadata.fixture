@@ -1,0 +1,5 @@
+{
+  "parser_name": "markitdown",
+  "parser_adapter_version": "test-adapter-v1",
+  "route_type": "OFFICE_DOCX"
+}
