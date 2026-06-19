@@ -21,6 +21,7 @@
 | 008 | `specs/008-parse-quality-checker/` | DONE | Parse quality checker |
 | 009 | `specs/009-quality-report-summary/` | DONE | Parse quality report summary |
 | 010 | `specs/010-evidence-chain/` | DONE | Evidence chain (chunk + evidence) |
+| 011 | `specs/011-curated-project-assets/` | DONE | Curated project assets (rule/template MVP) |
 
 ---
 
@@ -74,25 +75,21 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-The current active/planned phase is:
-
-`011 Curated Project Assets`
-
-Spec directory:
-
-`specs/011-curated-project-assets/`
-
-Branch:
-
-`feature/011-curated-project-assets`
-
-When starting work on 011, read this section first. Do not infer active spec from directory numbering alone.
+**No spec is currently ACTIVE.**
 
 The most recently completed phase is:
 
-`010 Evidence Chain` — `specs/010-evidence-chain/` — **DONE**
+`011 Curated Project Assets` — `specs/011-curated-project-assets/` — **DONE**
 
-### 4.3 011 Boundary (Active — Planned Implementation)
+Before starting any new implementation:
+
+1. Read this file (`specs/SPEC_INDEX.md`).
+2. Run an explicit **Active Spec Selection Review**.
+3. Do not infer active spec from directory numbering alone.
+
+Specs **001–011** are **DONE**. Do not auto-start `012-search-service`, `013-streamlit-admin`, or `008-review-workflow`.
+
+### 4.3 Completed 011 Boundary (Reference)
 
 `011-curated-project-assets` builds rule/template curated project files from 010 evidence and registry metadata.
 
@@ -116,23 +113,13 @@ It must not:
 - implement search service (012) or Streamlit / admin UI (013)
 - introduce schema migration without P2 DB Review and migration script
 
-P2 is **mandatory** before P4:
-
-```text
-Verify kb_project / kb_project_document / kb_curated_asset in init SQL
-Verify ORM models and idempotency keys
-Verify curated_root in AppConfig
-If schema/ORM insufficient -> STOP; migration gate before P4
-```
-
-P1 does **not** pre-judge migration necessity.
-
-Proposed CLI (P4):
+CLI:
 
 ```bash
 PYTHONPATH=backend python -m app.cli.main build-curated-project \
   --config config/app.yaml \
   --project-code <code> \
+  --project-name "<name>" \
   --manifest config/projects/<code>.yaml \
   --content-uid <uid> \
   --limit <n> \
@@ -140,6 +127,8 @@ PYTHONPATH=backend python -m app.cli.main build-curated-project \
   --force \
   --output /path/to/curated_build_report.json
 ```
+
+011 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
 ### 4.4 Completed 010 Boundary (Reference)
 

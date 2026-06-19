@@ -15,7 +15,7 @@
 | 008 | 解析质量检查 | MVP | DONE |
 | 009 | 质量报告摘要 | MVP | DONE |
 | 010 | 证据链 | Phase 2 | DONE |
-| 011 | 项目梳理资产 curated | Phase 2 | **ACTIVE / PLANNED** |
+| 011 | 项目梳理资产 curated | Phase 2 | DONE |
 | 012 | 检索服务 | Phase 2 | FUTURE |
 | 013 | Streamlit 管理台 | Phase 2 | FUTURE |
 | — | 人工复核闭环 | Phase 2 | FUTURE STUB (`specs/008-review-workflow/`，≠ 008 checker) |
@@ -29,7 +29,7 @@
 008-review-workflow         = 未来人工复核 stub（NOT CURRENT）
 009-quality-report-summary  = 已完成质量报告摘要（DONE）
 010-evidence-chain          = 已完成证据链（DONE）
-011-curated-project-assets  = 当前 ACTIVE / PLANNED
+011-curated-project-assets  = 已完成项目梳理资产（DONE）
 012-search-service          = 未来检索
 013-streamlit-admin         = 未来管理台
 ```

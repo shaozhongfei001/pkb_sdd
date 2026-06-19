@@ -617,7 +617,7 @@ parser.log
 
 只读 parsed + SELECT registry；不调用 parser、不写 curated/embedding/review。
 
-### 9.3 011-curated-project-assets（ACTIVE / PLANNED）
+### 9.3 011-curated-project-assets（DONE）
 
 从 010 evidence + registry 元数据生成项目化知识资产（**规则/模板 MVP**，非 LLM 蒸馏）：
 
@@ -626,20 +626,20 @@ curated/projects/{project_code}/
   00_project_card.md       # MVP
   10_evidence_index.md     # MVP
   source_documents.md      # MVP
-  01_background.md …       # 后续阶段
 ```
 
-写入 `kb_project` / `kb_project_document` / `kb_curated_asset`；产物必须引用 `evidence_uid` / `content_uid` / `document_uid`。
+- CLI: `build-curated-project`
+- 写入 `kb_project` / `kb_project_document` / `kb_curated_asset`
+- 产物引用 `evidence_uid` / `content_uid` / `document_uid`
+- **不做：** LLM 蒸馏、embedding、review workflow、parser 调用、search-service、Streamlit
 
-**不做：** LLM 蒸馏、embedding、review workflow、parser 调用、search-service、Streamlit。
+权威边界见 `specs/SPEC_INDEX.md` §4.3。当前无 ACTIVE spec；下一阶段须重新做 Active Spec Selection Review。
 
-Branch: `feature/011-curated-project-assets` · 权威边界见 `specs/SPEC_INDEX.md` §4.3。
-
-### 9.4 012-search-service
+### 9.4 012-search-service（FUTURE — 未启动）
 
 实现基于 MySQL FULLTEXT 的检索服务。
 
-### 9.5 013-streamlit-admin
+### 9.5 013-streamlit-admin（FUTURE — 未启动）
 
 实现 Streamlit 管理台。
 
