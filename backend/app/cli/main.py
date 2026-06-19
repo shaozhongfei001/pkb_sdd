@@ -26,6 +26,7 @@ from app.services.parse_registry import (
 )
 from app.services.parse_quality_checker import ParseQualityCheckerService
 from app.services.parse_quality_report_summarizer import ParseQualityReportSummarizerService
+from app.services.curated_project_assets import CuratedProjectAssetsService
 from app.services.evidence_chain import EvidenceChainService
 from app.services.parser_router import ParserRouterService
 
@@ -793,6 +794,97 @@ def build_evidence_chain(
     console.print(f"Errors: {len(result.errors)}")
     if result.report_path is not None:
         console.print(f"Evidence build report: {result.report_path}")
+
+
+@app.command("build-curated-project")
+def build_curated_project(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    project_code: str = typer.Option(
+        ...,
+        "--project-code",
+        help="Project code for curated assets.",
+    ),
+    project_name: str | None = typer.Option(
+        None,
+        "--project-name",
+        help="Project display name (required when creating a new project without manifest).",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Single-document mode: content uid to include.",
+    ),
+    manifest: Path | None = typer.Option(
+        None,
+        "--manifest",
+        help="Optional YAML manifest with project metadata and documents.",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Maximum number of documents to include.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Plan curated build without DB or curated file writes.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing curated files and upsert metadata.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Optional JSON build report output path.",
+    ),
+) -> None:
+    """Build curated project assets from evidence and registry metadata.
+
+    Writes curated Markdown under curated_root and kb_project / kb_project_document /
+    kb_curated_asset only.
+    Does not call parsers, read raw_vault binaries, LLM-distill, or modify parsed artifacts.
+    Use --dry-run for zero DB and zero curated file writes.
+    """
+    if limit is not None and limit < 1:
+        console.print("ERROR: --limit must be >= 1")
+        raise typer.Exit(code=1)
+
+    config_path = config or DEFAULT_CONFIG_PATH
+    try:
+        app_config = load_config(config_path)
+        service = CuratedProjectAssetsService(app_config)
+        result = service.build(
+            project_code=project_code,
+            project_name=project_name,
+            content_uid=content_uid,
+            manifest_path=manifest,
+            limit=limit,
+            dry_run=dry_run,
+            force=force,
+            output=output,
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        console.print(f"ERROR: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"Project code: {result.project_code}")
+    console.print(f"Project uid: {result.project_uid}")
+    console.print(f"Documents mapped: {result.documents_mapped}")
+    console.print(f"Evidence rows read: {result.evidence_rows_read}")
+    console.print(f"Assets written: {result.assets_written}")
+    console.print(f"Assets skipped: {result.assets_skipped}")
+    console.print(f"Files written: {result.files_written}")
+    console.print(f"Dry run: {dry_run}")
+    console.print(f"Warnings: {len(result.warnings)}")
+    console.print(f"Errors: {len(result.errors)}")
+    if result.report_path is not None:
+        console.print(f"Curated build report: {result.report_path}")
 
 
 @app.command("build-parse-queue")
