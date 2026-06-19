@@ -4,207 +4,291 @@
 > Spec: `specs/010-evidence-chain/`  
 > Branch: `feature/010-evidence-chain`  
 > Stage: P6 E2E Validation  
+> Initial blocked report: `ea18034`  
 > P5 commit: `d45b71d`  
-> Status: **P6 BLOCKED — cannot complete full E2E**
+> Status: **P6 COMPLETE — PASS** (after environment setup + re-run)
 
 ---
 
 ## 1. Gate Conclusion
 
-**P6 E2E Validation: BLOCKED**
+**P6 E2E Validation: PASS**
 
-Full end-to-end validation of `build-evidence-chain` against real MySQL + real parsed artifacts **cannot be completed** in the current local environment.
+After P6 environment setup (001 scan → 002 copy-to-vault → 005 parse-markitdown → 006 register-parse-report), `build-evidence-chain` was validated against:
 
-Reason: the only on-disk MarkItDown SUCCESS parsed tree under `config/app.yaml` `parsed_root` is **not linked** to `kb_parse_result` / `kb_file_content`. All registry SUCCESS rows point to **deleted** `/tmp/pytest-of-root/...` paths. Using registry-only or synthetic fixture data would violate P6 rules.
+- real `config/app.yaml`
+- real MySQL
+- real `raw_vault` + `parsed` artifacts (MarkItDown SUCCESS)
+- real registry-linked `kb_parse_result` row
 
-**Do not enter P7** until a real parsed + registry-linked sample is available and P6 is re-run.
+All P6 evidence-chain checks passed. **010 runtime did not invoke parsers** during `build-evidence-chain` runs.
 
-Partial checks performed (dry-run probe, schema validation, environment inventory) are documented below.
+Initial attempt (`ea18034`) was **BLOCKED** due to missing registry link; resolved by setup below without modifying 010 backend code.
 
 ---
 
-## 2. Blocker Analysis
+## 2. Candidate Sample Selection
 
-### 2.1 On-disk parsed sample (real, not synthetic)
+### 2.1 Selection criteria
+
+| Criterion | Result |
+|---|---|
+| MarkItDown-suitable content | `.txt` / `text/plain` |
+| `kb_file_content.vault_status = COPIED` (after setup) | Yes |
+| `raw_vault/.../original.bin` on project path | Yes |
+| Valid parsed three-file set on disk | Yes (pre-existing from prior 005 run) |
+| No non-`/tmp` `kb_parse_result` before setup | Yes (gap filled by setup) |
+
+### 2.2 Selected sample
 
 | Field | Value |
 |---|---|
 | `content_uid` | `536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6` |
-| `sha256` | `536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6` |
+| `sha256` | same as `content_uid` |
+| Source file | `backend/tests/fixtures/中文路径/银行项目/方案.txt` |
 | `parser_name` | `markitdown` |
-| `manifest status` | `SUCCESS` |
-| `parsed_dir` | `/home/szf/dev/pyws/pkb_sdd/parsed/by_hash/53/69/536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6` |
-| `parsed_text.md` | Present (19 bytes, Chinese text `示例方案内容`) |
-| `raw_vault original.bin` | Present at `/home/szf/dev/pyws/pkb_sdd/raw_vault/by_hash/53/536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6/original.bin` |
+| `file_ext` | `.txt` |
+| Parsed text | `示例方案内容` (single section, no headings → 1 chunk) |
 
-This is the **only** `parse_manifest.json` under project `parsed/` (verified via `find parsed -name parse_manifest.json`).
+### 2.3 Why this sample
 
-### 2.2 MySQL registry gap
+- SHA256 matches existing project `raw_vault` and `parsed` trees under `config/app.yaml` paths (real artifacts, not synthetic fixture dir copied into `/tmp`).
+- Chinese filename path preserved in inventory scan source.
+- Before setup: parsed on disk but **no** `kb_file_content` → evidence chain could not select candidate (initial P6 BLOCKED).
+- After setup: full chain `kb_file_content` → parsed → `kb_parse_result SUCCESS`.
 
-```sql
-SELECT COUNT(*) FROM kb_parse_result WHERE parsed_dir NOT LIKE '/tmp/%';
--- 0
+### 2.4 Rejected alternatives
 
-SELECT COUNT(*) FROM kb_parse_result;
--- 180 (all parsed_dir under /tmp/pytest-of-root/...)
-```
+| Candidate | Reason rejected |
+|---|---|
+| `796751...` (only COPIED row before setup) | `.pdf`; vault_path under `/tmp/p5_reqa_...`; no project parsed tree |
+| Registry rows under `/tmp/pytest-of-root/...` | Parsed paths deleted on disk |
 
-Sample path check:
+---
 
-```text
-/tmp/pytest-of-root/pytest-60/.../8888.../parsed_text.md → MISSING on disk
-```
+## 3. P6 Environment Setup (not 010 runtime)
 
-`kb_file_content` for sha256 `536985...`:
-
-```text
-(no row)
-```
-
-### 2.3 Reconcile attempt (prerequisite probe, not P6 success path)
+Setup used existing 001/002/005/006 CLI only. **Not** part of `build-evidence-chain` behavior.
 
 ```bash
-PYTHONPATH=backend python -m app.cli.main reconcile-parsed-artifacts \
+cd /home/szf/dev/pyws/pkb_sdd
+source backend/.venv/bin/activate
+
+# 001 — register file instances from real fixture path
+PYTHONPATH=backend python -m app.cli.main scan \
+  --config config/app.yaml \
+  --path backend/tests/fixtures/中文路径
+
+# 002 — link DB to existing project raw_vault (skipped bin copy, refreshed metadata)
+PYTHONPATH=backend python -m app.cli.main copy-to-vault \
   --config config/app.yaml \
   --sha256 536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6
+
+# 005 — idempotent skip (manifest already SUCCESS on disk); report still emitted
+PYTHONPATH=backend python -m app.cli.main parse-markitdown \
+  --config config/app.yaml \
+  --sha256 536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6
+
+# 006 — register parse report → kb_parse_result SUCCESS + artifacts
+PYTHONPATH=backend python -m app.cli.main register-parse-report \
+  --config config/app.yaml \
+  --report-path /home/szf/dev/data/personal-kb/reports/parse_markitdown_report_20260619T132348Z.json
 ```
 
-Result:
+Setup results:
 
 ```text
-Orphan manifest without DB content: .../parse_manifest.json
-Results recorded: 0
-Artifacts recorded: 0
+scan: 2 instances, 1 unique content
+copy-to-vault: Skipped (already copied), Metadata refreshed: 1
+parse-markitdown: Skipped: 1 (idempotent_success_manifest)
+register-parse-report: Results recorded: 1, Artifacts recorded: 4, Status: COMPLETED
 ```
 
-Cannot register parsed manifest without prior `kb_file_content` / inventory row.
+Registry row after setup:
 
-### 2.4 Evidence chain probe (dry-run only)
+```text
+kb_parse_result.status = SUCCESS
+parsed_dir = /home/szf/dev/pyws/pkb_sdd/parsed/by_hash/53/69/536985.../
+manifest_path = .../parse_manifest.json
+```
+
+---
+
+## 4. Parsed Artifact Paths
+
+```text
+/home/szf/dev/pyws/pkb_sdd/parsed/by_hash/53/69/536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6/
+  parsed_text.md
+  parsed_metadata.json
+  parse_manifest.json
+
+/home/szf/dev/pyws/pkb_sdd/raw_vault/by_hash/53/536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6/
+  original.bin
+```
+
+---
+
+## 5. E2E Evidence Chain Commands
+
+Evidence window DB baseline taken **after setup**, **before** `build-evidence-chain` runs. Pre-existing chunk/evidence rows for this content were cleared once for a clean first-write test.
 
 ```bash
+CONTENT_UID=536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6
+
+# 1 dry-run
 PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
   --config config/app.yaml \
-  --content-uid 536985990c2e2203a74c297bf66c7939873e53647bb41fb9cc72bb42bd6463d6 \
+  --content-uid "$CONTENT_UID" \
   --dry-run \
-  --output /tmp/pkb_sdd_010_p6/evidence_dry_run_probe.json
+  --output /tmp/pkb_sdd_010_p6/evidence_dry_run_report.json
+
+# 2 non dry-run
+PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
+  --config config/app.yaml \
+  --content-uid "$CONTENT_UID" \
+  --output /tmp/pkb_sdd_010_p6/evidence_run_report.json
+
+# 3 no-force rerun
+PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
+  --config config/app.yaml \
+  --content-uid "$CONTENT_UID" \
+  --output /tmp/pkb_sdd_010_p6/evidence_rerun_no_force_report.json
+
+# 4 force rerun
+PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
+  --config config/app.yaml \
+  --content-uid "$CONTENT_UID" \
+  --force \
+  --output /tmp/pkb_sdd_010_p6/evidence_force_report.json
 ```
 
-CLI exit code: **0**
-
-```text
-Candidates selected: 0
-Documents processed: 0
-Chunks upserted: 0
-Evidence upserted: 0
-Dry run: True
-```
-
-Expected behavior: service selects candidates from `kb_parse_result` only; no matching row → zero candidates. **Not sufficient for P6 PASS.**
+**Note:** First failed E2E attempt used bash variable `UID` (readonly) — `--content-uid` was empty → 0 candidates. Re-run used `CONTENT_UID`. Documented as operator error, not product defect.
 
 ---
 
-## 3. E2E Steps Not Executed
+## 6. Report Summaries
 
-Due to blocker, the following P6 steps were **not run**:
+### 6.1 Dry-run (`evidence_dry_run_report.json`)
 
-| Step | Status |
+| Field | Value |
 |---|---|
-| Non dry-run build | **NOT RUN** (0 candidates) |
-| Re-run without `--force` (skip) | **NOT RUN** |
-| Re-run with `--force` (upsert idempotent) | **NOT RUN** |
-| DB before/after chunk/evidence growth | **NOT RUN** (tables remain 0) |
-| Idempotency UID verification on real MySQL | **NOT RUN** |
+| `dry_run` | `true` |
+| `candidates_selected` | 1 |
+| `documents_processed` | 1 |
+| `chunks_planned` | 1 |
+| `chunks_upserted` | **0** |
+| `evidence_upserted` | **0** |
+| DB chunk rows after | **0** |
+
+**PASS** — zero DB write.
+
+### 6.2 Non dry-run (`evidence_run_report.json`)
+
+| Field | Value |
+|---|---|
+| `chunks_upserted` | 1 |
+| `evidence_upserted` | 1 |
+| Chunk | `chunk_index=0`, `chunk_level=section`, `page_no=null`, `bbox=null` |
+| Content | `示例方案内容` |
+
+**PASS** — first real write.
+
+### 6.3 No-force rerun (`evidence_rerun_no_force_report.json`)
+
+| Field | Value |
+|---|---|
+| `documents_processed` | 0 |
+| `documents_skipped` | **1** |
+| `chunks_upserted` | 0 |
+
+**PASS** — skip when chunks already exist.
+
+### 6.4 Force rerun (`evidence_force_report.json`)
+
+| Field | Value |
+|---|---|
+| `chunks_upserted` | 1 (upsert) |
+| `documents_processed` | 1 |
+| Chunk UID set | **unchanged** vs after first run |
+
+**PASS** — upsert idempotent; no duplicate UID rows.
+
+### 6.5 JSON schema
+
+All four reports: `report_type=evidence_build_report`, `schema_version=1.0`, `mode=build`. **PASS**
 
 ---
 
-## 4. Partial Validation Results
+## 7. DB Row Counts (evidence window)
 
-### 4.1 Dry-run report schema (`evidence_dry_run_probe.json`)
-
-| Field | Observed | Expected | Result |
+| Table | Before evidence runs | After evidence runs | Delta |
 |---|---|---|---|
-| `report_type` | `evidence_build_report` | `evidence_build_report` | PASS |
-| `schema_version` | `1.0` | `1.0` | PASS |
-| `mode` | `build` | `build` | PASS |
-| `dry_run` | `true` | `true` | PASS |
-| `summary.candidates_selected` | `0` | N/A (blocked env) | INFO |
+| `kb_document_chunk` | 0 | **1** | +1 |
+| `kb_evidence` | 0 | **1** | +1 |
+| `kb_document` | 3 | 3 | 0 |
+| `kb_parse_run` | 183 | 183 | 0 |
+| `kb_parse_result` | 181 | 181 | 0 |
+| `kb_parsed_artifact` | 634 | 634 | 0 |
+| `kb_curated_asset` | 0 | 0 | 0 |
+| `kb_review_item` | 0 | 0 | 0 |
+| `kb_embedding_ref` | 0 | 0 | 0 |
 
-JSON file generated at `/tmp/pkb_sdd_010_p6/evidence_dry_run_probe.json`. **Schema valid.**
+**PASS** — only chunk + evidence tables changed during evidence-chain runs.
 
-### 4.2 DB table counts (snapshot at P6 time)
-
-| Table | Row count |
-|---|---|
-| `kb_document_chunk` | 0 |
-| `kb_evidence` | 0 |
-| `kb_document` | 2 |
-| `kb_parse_run` | 182 |
-| `kb_parse_result` | 180 |
-| `kb_parsed_artifact` | 630 |
-| `kb_curated_asset` | 0 |
-| `kb_review_item` | 0 |
-| `kb_embedding_ref` | 0 |
-
-No chunk/evidence rows before or after probe. Registry tables unchanged by probe (dry-run + 0 candidates).
-
-### 4.3 Filesystem mtime (real sample, unchanged after probe)
-
-| Path | mtime |
-|---|---|
-| `parsed/.../parsed_text.md` | 2026-06-15 19:32:02 +0800 |
-| `parsed/.../parsed_metadata.json` | 2026-06-15 19:32:02 +0800 |
-| `parsed/.../parse_manifest.json` | 2026-06-15 19:32:02 +0800 |
-| `raw_vault/.../original.bin` | 2026-06-15 02:03:10 +0800 |
-
-No modification during dry-run probe. **PASS** (read-only boundary preserved).
-
----
-
-## 5. Report Summaries (executed vs planned)
-
-| Report file | Executed | Summary |
-|---|---|---|
-| `evidence_dry_run_report.json` | Partial (`evidence_dry_run_probe.json`) | 0 candidates; schema OK |
-| `evidence_run_report.json` | **NOT RUN** | — |
-| `evidence_rerun_no_force_report.json` | **NOT RUN** | — |
-| `evidence_force_report.json` | **NOT RUN** | — |
-
----
-
-## 6. E2E Defects
-
-| ID | Severity | Description |
-|---|---|---|
-| E2E-BLOCK-1 | **Blocker** | No `kb_parse_result` row with non-`/tmp` `parsed_dir` pointing to existing artifacts |
-| E2E-BLOCK-2 | **Blocker** | Sole real parsed sample (`536985...`) has no `kb_file_content`; reconcile cannot register |
-| E2E-BLOCK-3 | **Blocker** | 180 registry SUCCESS rows reference deleted pytest temp parsed trees |
-
-**Not an implementation defect in 010 code** — environment / data pipeline gap (001 scan → 002 vault → 005/006 parse/register not completed for the real parsed sample).
-
----
-
-## 7. Recommended Unblock Steps (for operator, not P6 scope)
-
-1. Re-run **001 scan** + **002 copy-to-vault** for source file matching sha256 `536985...`, **or** insert consistent `kb_file_content` if vault already exists.
-2. Run **006 reconcile-parsed-artifacts** or **register-parse-report** so `kb_parse_result` references the on-disk parsed dir.
-3. Re-run P6 E2E with same `content_uid` / `sha256`.
-
-Alternative: parse a fresh COPIED content (e.g. `796751...` has vault but no parsed) via **005 parse-markitdown** + registry, then run P6.
-
----
-
-## 8. P6 Change Summary
-
-P6 modified **documentation only**:
+Persisted rows:
 
 ```text
-specs/010-evidence-chain/p6_e2e_report.md
+chunk_uid:   214a434afc150e54e796925c9724457eeda75c6916caf73d4439f9ac666b93a5
+evidence_uid: d5458356b1a85c241112e4fdda2e5ca6ee9a5adf46c476c0d13dc682deb0c4b3
+evidence_type: section_quote
+quote_text: 示例方案内容
 ```
-
-No `backend/**`, `parsed/**`, or `raw_vault/**` modifications.
 
 ---
 
-## 9. STOP
+## 8. Filesystem Boundary
 
-P6 completed with **BLOCKED** status. **Do not enter P7** until user confirms unblock path and P6 re-run.
+| Path | mtime before | mtime after | Changed |
+|---|---|---|---|
+| `parsed/.../parsed_text.md` | 2026-06-15 19:32:02 | same | **No** |
+| `parsed/.../parsed_metadata.json` | 2026-06-15 19:32:02 | same | **No** |
+| `parsed/.../parse_manifest.json` | 2026-06-15 19:32:02 | same | **No** |
+| `raw_vault/.../original.bin` | 2026-06-15 02:03:53 | same | **No** |
+
+**PASS**
+
+---
+
+## 9. 010 Runtime Behavior
+
+| Check | Result |
+|---|---|
+| `build-evidence-chain` calls MarkItDown/MinerU | **No** (reads parsed only) |
+| Setup phase parser use | 005 used during setup only (separate CLI) |
+| Reparse / repair / 008/009 consume | **No** |
+| LLM / embedding / curated writes | **No** |
+
+**PASS**
+
+---
+
+## 10. Defects
+
+**No 010 implementation defects found.**
+
+| ID | Severity | Note |
+|---|---|---|
+| OPS-1 | Info | Initial P6 blocked: orphan parsed without `kb_file_content` — fixed by setup |
+| OPS-2 | Info | bash `UID` readonly variable caused empty `--content-uid` on first re-run attempt |
+
+---
+
+## 11. Historical: Initial BLOCKED (`ea18034`)
+
+First P6 attempt documented missing registry-linked sample. Resolved by §3 setup without code changes.
+
+---
+
+## 12. STOP
+
+P6 E2E **COMPLETE**. **Do not enter P7** until user confirms.
