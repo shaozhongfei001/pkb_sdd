@@ -633,11 +633,20 @@ curated/projects/{project_code}/
 - 产物引用 `evidence_uid` / `content_uid` / `document_uid`
 - **不做：** LLM 蒸馏、embedding、review workflow、parser 调用、search-service、Streamlit
 
-权威边界见 `specs/SPEC_INDEX.md` §4.3。当前无 ACTIVE spec；下一阶段须重新做 Active Spec Selection Review。
+权威边界见 `specs/SPEC_INDEX.md` §4.3。
 
-### 9.4 012-search-service（FUTURE — 未启动）
+### 9.4 012-search-service（ACTIVE / NOT IMPLEMENTED）
 
-实现基于 MySQL FULLTEXT 的检索服务。
+实现基于 MySQL FULLTEXT 的**只读**检索服务（无 embedding、无 parser、无 raw_vault/parsed 读取）：
+
+- 检索域（MVP）：`kb_document.title`、`kb_document_chunk.content`、`kb_evidence` 文本、`kb_project`、`kb_curated_asset.asset_title`
+- CLI: `search-kb`（`--query`、`--scope`、`--project-code`、`--limit`、`--offset`）
+- 可选 FastAPI: `GET /api/v1/search`（P3 锁定是否 MVP）
+- 命中须带 `evidence_uid` / `document_uid` / `content_uid`（适用时）
+- `--project-code` 过滤经 `kb_project_document`（不依赖 `kb_evidence.project_uid` backfill）
+- **不做：** LLM、embedding、review workflow、parser、Streamlit、DB 写入（MVP）
+
+权威边界见 `specs/SPEC_INDEX.md` §4.7。P1 完成后 STOP，待 P2 DB Review。
 
 ### 9.5 013-streamlit-admin（FUTURE — 未启动）
 
