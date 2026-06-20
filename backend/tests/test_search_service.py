@@ -896,3 +896,125 @@ def test_cli_help_documents_contract() -> None:
     assert "ngram_token_size=2" in result.stdout
     assert "kb_project_document" in result.stdout
     assert "raw_vault" in result.stdout
+
+
+def test_cli_table_format_smoke(workspace: Path) -> None:
+    config_path = workspace / "app.yaml"
+    config_path.write_text("placeholder", encoding="utf-8")
+    config = _test_config(workspace)
+    service, _ = _service(workspace)
+
+    with patch("app.cli.main.load_config", return_value=config), patch(
+        "app.cli.main.SearchService", return_value=service
+    ):
+        result = cli_runner.invoke(
+            app,
+            [
+                "search-kb",
+                "--config",
+                str(config_path),
+                "--query",
+                "银行",
+                "--scope",
+                "document",
+                "--format",
+                "table",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "total_count=" in result.stdout
+    assert "document" in result.stdout
+
+
+def test_cli_no_hits_exit_0(workspace: Path) -> None:
+    config_path = workspace / "app.yaml"
+    config_path.write_text("placeholder", encoding="utf-8")
+    config = _test_config(workspace)
+    service, _ = _service(workspace)
+
+    with patch("app.cli.main.load_config", return_value=config), patch(
+        "app.cli.main.SearchService", return_value=service
+    ):
+        result = cli_runner.invoke(
+            app,
+            [
+                "search-kb",
+                "--config",
+                str(config_path),
+                "--query",
+                "不存在的关键词",
+                "--format",
+                "json",
+            ],
+        )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["summary"]["total_count"] == 0
+    assert payload["hits"] == []
+
+
+def test_cli_invalid_scope_exit_1(workspace: Path) -> None:
+    config_path = workspace / "app.yaml"
+    config_path.write_text("placeholder", encoding="utf-8")
+    config = _test_config(workspace)
+
+    with patch("app.cli.main.load_config", return_value=config):
+        result = cli_runner.invoke(
+            app,
+            [
+                "search-kb",
+                "--config",
+                str(config_path),
+                "--query",
+                "银行",
+                "--scope",
+                "invalid",
+                "--format",
+                "json",
+            ],
+        )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["error_code"] == "SEARCH_INVALID_SCOPE"
+
+
+def test_fulltext_natural_language_mode_in_sql(workspace: Path) -> None:
+    service, factory = _service(workspace)
+    service.search(SearchQuery.validate_and_build(text="银行", scope="all"))
+    sql_joined = "\n".join(factory.session.executed_sql)
+    assert "NATURAL LANGUAGE MODE" in sql_joined
+    assert "MATCH(" in sql_joined
+    assert " LIKE " not in sql_joined.upper()
+
+
+def test_scope_all_executes_per_scope_count(workspace: Path) -> None:
+    service, factory = _service(workspace)
+    response = service.search(SearchQuery.validate_and_build(text="银行", scope="all"))
+    count_sqls = [sql for sql in factory.session.executed_sql if "COUNT(*)" in sql.upper()]
+    assert len(count_sqls) == 5
+    assert response.scopes_executed == list(
+        ("document", "chunk", "evidence", "project", "curated")
+    )
+
+
+def test_evidence_hits_via_project_document_not_evidence_project_uid(
+    workspace: Path,
+) -> None:
+    seed = _seed_data()
+    assert seed["evidence"]["ev_001"].project_uid == "should_not_filter"
+    service, factory = _service(workspace, seed)
+    response = service.search(
+        SearchQuery.validate_and_build(
+            text="风险管理",
+            scope="evidence",
+            project_code="DEMO-2024",
+        )
+    )
+    assert len(response.hits) == 1
+    assert response.hits[0].evidence_uid == "ev_001"
+    sql_joined = "\n".join(factory.session.executed_sql)
+    assert "kb_project_document" in sql_joined
+    assert "e.project_uid" not in sql_joined
