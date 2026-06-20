@@ -1,0 +1,11 @@
+{
+  "fixture_name": "chinese_evidence",
+  "description": "Metadata for Chinese FULLTEXT search P6 E2E — not ingested by inventory scanner.",
+  "sample_queries": ["银行", "信贷", "银行信贷"],
+  "ngram_token_size_note": 2,
+  "seed_hints": {
+    "document_title": "银行信贷政策文档",
+    "chunk_content": "银行信贷业务经营规范",
+    "evidence_quote": "银行信贷风险管理"
+  }
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -29,6 +30,12 @@ from app.services.parse_quality_report_summarizer import ParseQualityReportSumma
 from app.services.curated_project_assets import CuratedProjectAssetsService
 from app.services.evidence_chain import EvidenceChainService
 from app.services.parser_router import ParserRouterService
+from app.schemas.search import SearchQuery, SearchValidationError
+from app.services.search_service import (
+    build_error_payload,
+    build_success_payload,
+    SearchService,
+)
 
 app = typer.Typer(help="Personal KB CLI. Implement commands according to specs.")
 console = Console()
@@ -885,6 +892,137 @@ def build_curated_project(
     console.print(f"Errors: {len(result.errors)}")
     if result.report_path is not None:
         console.print(f"Curated build report: {result.report_path}")
+
+
+@app.command("search-kb")
+def search_kb(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to app.yaml. Defaults to project config/app.yaml.",
+    ),
+    query: str = typer.Option(
+        ...,
+        "--query",
+        help="Non-empty UTF-8 search string.",
+    ),
+    scope: str = typer.Option(
+        "all",
+        "--scope",
+        help="Search scope: all, document, chunk, evidence, project, or curated.",
+    ),
+    project_code: str | None = typer.Option(
+        None,
+        "--project-code",
+        help="Restrict hits to project mapping via kb_project_document.",
+    ),
+    content_uid: str | None = typer.Option(
+        None,
+        "--content-uid",
+        help="Filter hits to a single content_uid.",
+    ),
+    document_uid: str | None = typer.Option(
+        None,
+        "--document-uid",
+        help="Filter hits to a single document_uid.",
+    ),
+    limit: int = typer.Option(
+        20,
+        "--limit",
+        help="Page size (1-100).",
+    ),
+    offset: int = typer.Option(
+        0,
+        "--offset",
+        help="Skip hits after merge-sort (scope=all) or per-scope offset.",
+    ),
+    output_format: str = typer.Option(
+        "json",
+        "--format",
+        help="Output format: json or table.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Write JSON report to operator path (same structure as stdout JSON).",
+    ),
+) -> None:
+    """Search knowledge base via read-only MySQL FULLTEXT (ngram).
+
+    Queries kb_document, kb_document_chunk, kb_evidence, kb_project, kb_curated_asset only.
+    Does not read raw_vault, parsed files, or call parsers.
+    Single-character Chinese queries may return no hits (ngram_token_size=2).
+    Project filter uses kb_project_document mapping, not kb_evidence.project_uid.
+    """
+    if output_format not in {"json", "table"}:
+        console.print("ERROR: --format must be json or table")
+        raise typer.Exit(code=1)
+
+    config_path = config or DEFAULT_CONFIG_PATH
+    generated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    try:
+        app_config = load_config(config_path)
+    except (FileNotFoundError, OSError) as exc:
+        console.print(f"ERROR: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    try:
+        search_query = SearchQuery.validate_and_build(
+            text=query,
+            scope=scope,
+            project_code=project_code,
+            content_uid=content_uid,
+            document_uid=document_uid,
+            limit=limit,
+            offset=offset,
+        )
+        service = SearchService(app_config)
+        response = service.search(search_query)
+        payload = build_success_payload(app_config, response, generated_at)
+    except SearchValidationError as exc:
+        if output_format == "json":
+            payload = build_error_payload(
+                app_config,
+                exc.error_code,
+                str(exc),
+                query,
+                scope,
+                project_code,
+                generated_at,
+            )
+            console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            console.print(f"ERROR: {exc}")
+        raise typer.Exit(code=1) from exc
+    except RuntimeError as exc:
+        console.print(f"ERROR: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if output_format == "json":
+        json_text = json.dumps(payload, ensure_ascii=False, indent=2)
+        console.print(json_text)
+        if output is not None:
+            output.write_text(json_text + "\n", encoding="utf-8")
+    else:
+        console.print(
+            f"total_count={payload['summary']['total_count']} "
+            f"returned={payload['summary']['returned_count']}"
+        )
+        for hit in payload["hits"]:
+            snippet = hit.get("snippet", "")
+            if len(snippet) > 80:
+                snippet = snippet[:79] + "…"
+            console.print(
+                f"{hit['hit_type']:8} {hit['relevance_score']:8.2f} "
+                f"{hit.get('document_uid') or '-':16} "
+                f"{hit.get('evidence_uid') or '-':16} {snippet}"
+            )
+        if output is not None:
+            output.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
 
 
 @app.command("build-parse-queue")
