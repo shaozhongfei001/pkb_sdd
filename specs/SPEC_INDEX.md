@@ -22,6 +22,7 @@
 | 009 | `specs/009-quality-report-summary/` | DONE | Parse quality report summary |
 | 010 | `specs/010-evidence-chain/` | DONE | Evidence chain (chunk + evidence) |
 | 011 | `specs/011-curated-project-assets/` | DONE | Curated project assets (rule/template MVP) |
+| 012 | `specs/012-search-service/` | DONE | Read-only MySQL FULLTEXT search service |
 
 ---
 
@@ -74,26 +75,63 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-**Active spec:**
-
-`012 Search Service` — `specs/012-search-service/` — **ACTIVE / NOT IMPLEMENTED**
-
-Branch: `feature/012-search-service` (create on P2/P4 entry after P1 approval).
+**No spec is currently ACTIVE.**
 
 The most recently completed phase is:
 
-`011 Curated Project Assets` — `specs/011-curated-project-assets/` — **DONE**
+`012 Search Service` — `specs/012-search-service/` — **DONE**
 
-Before P4 implementation:
+Before starting any new implementation:
 
 1. Read this file (`specs/SPEC_INDEX.md`).
-2. Complete **P2 DB Review** PASS for 012.
-3. Complete **P3 Implementation Gate** before Dev whitelist entry.
-4. Do not infer active spec from directory numbering alone.
+2. Run explicit **Active Spec Selection Review** — do not infer active spec from directory numbering alone.
+3. Do not auto-start `013-streamlit-admin` or `008-review-workflow`.
 
-Specs **001–011** are **DONE**. Do not auto-start `013-streamlit-admin` or `008-review-workflow`. Do not re-open 011 unless a defect spec is approved.
+Specs **001–012** are **DONE**. Do not re-open 012 unless a defect spec is approved.
 
-### 4.3 Completed 011 Boundary (Reference)
+### 4.3 Completed 012 Boundary (Reference)
+
+`012-search-service` provides read-only MySQL FULLTEXT keyword search over 010/011-populated tables.
+
+It may:
+
+- read `config/app.yaml` (mysql for sessions, `pipeline_version` for logging)
+- SELECT from `kb_document`, `kb_document_chunk`, `kb_evidence`, `kb_project`, `kb_project_document`, `kb_curated_asset` using existing FULLTEXT indexes (ngram)
+- expose CLI `search-kb`
+- write optional JSON results to operator `--output` path (not DB)
+
+It must not:
+
+- read `raw_vault` binary objects (`original.bin`) or `raw_vault/**` for search text
+- read `parsed_text.md`, `parsed_metadata.json`, or `parse_manifest.json`
+- modify parsed artifacts, curated files, or original user files
+- call MarkItDown, MinerU, or `magic-pdf` at runtime
+- reparse, repair, or auto-fix 008/009 quality findings
+- INSERT/UPDATE/DELETE any MySQL table in MVP (SELECT-only)
+- write `kb_document_chunk`, `kb_evidence`, `kb_project`, `kb_curated_asset`, parse registry, `kb_review_item`, or `kb_embedding_ref`
+- use LLM query expansion, semantic similarity, embedding generation, or vector stores
+- implement Streamlit admin UI (013 scope)
+- introduce schema migration without P2 DB Review and migration script
+
+`--project-code` filter must use `kb_project_document` mapping (011 does not backfill `kb_evidence.project_uid` in MVP).
+
+CLI:
+
+```bash
+PYTHONPATH=backend python -m app.cli.main search-kb \
+  --config config/app.yaml \
+  --query "<keywords>" \
+  --scope all|document|chunk|evidence|project|curated \
+  --project-code <code> \
+  --limit 20 \
+  --offset 0 \
+  --format json|table \
+  --output /path/to/search_results.json
+```
+
+012 must not be re-opened for implementation unless a new defect spec is explicitly approved.
+
+### 4.4 Completed 011 Boundary (Reference)
 
 `011-curated-project-assets` builds rule/template curated project files from 010 evidence and registry metadata.
 
@@ -134,7 +172,7 @@ PYTHONPATH=backend python -m app.cli.main build-curated-project \
 
 011 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.4 Completed 010 Boundary (Reference)
+### 4.5 Completed 010 Boundary (Reference)
 
 `010-evidence-chain` builds chunk and evidence metadata from parsed artifacts.
 
@@ -172,7 +210,7 @@ PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
 
 010 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.5 Completed 009 Boundary (Reference)
+### 4.6 Completed 009 Boundary (Reference)
 
 `009-quality-report-summary` is a completed read-only report consumption phase.
 
@@ -205,54 +243,9 @@ If a future design proposes DB writes or filesystem reads beyond the 008 JSON re
 
 009 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.6 Completed 008 Boundary (Reference)
+### 4.7 Completed 008 Boundary (Reference)
 
 `008-parse-quality-checker` remains a completed read-only checker. It must not be re-opened for implementation unless a new defect spec is explicitly approved.
-
-### 4.7 Active 012 Boundary (CURRENT)
-
-`012-search-service` provides read-only MySQL FULLTEXT keyword search over 010/011-populated tables.
-
-It may (P4+, after P2 DB Review PASS):
-
-- read `config/app.yaml` (mysql for sessions, `pipeline_version` for logging)
-- SELECT from `kb_document`, `kb_document_chunk`, `kb_evidence`, `kb_project`, `kb_project_document`, `kb_curated_asset` using existing FULLTEXT indexes (ngram)
-- optional SELECT from `kb_file_content`, `kb_parse_result` for hit enrichment (P3 lock)
-- expose CLI `search-kb` and optional FastAPI `GET /api/v1/search` (P3 lock)
-- write optional JSON results to operator `--output` path (not DB)
-
-It must not:
-
-- read `raw_vault` binary objects (`original.bin`) or `raw_vault/**` for search text
-- read `parsed_text.md`, `parsed_metadata.json`, or `parse_manifest.json`
-- modify parsed artifacts, curated files, or original user files
-- call MarkItDown, MinerU, or `magic-pdf` at runtime
-- reparse, repair, or auto-fix 008/009 quality findings
-- INSERT/UPDATE/DELETE any MySQL table in MVP (SELECT-only unless P2 expands)
-- write `kb_document_chunk`, `kb_evidence`, `kb_project`, `kb_curated_asset`, parse registry, `kb_review_item`, or `kb_embedding_ref`
-- use LLM query expansion, semantic similarity, embedding generation, or vector stores
-- implement Streamlit admin UI (013 scope)
-- introduce schema migration without P2 DB Review and migration script
-
-`--project-code` filter must use `kb_project_document` mapping (011 does not backfill `kb_evidence.project_uid` in MVP).
-
-CLI:
-
-```bash
-PYTHONPATH=backend python -m app.cli.main search-kb \
-  --config config/app.yaml \
-  --query "<keywords>" \
-  --scope all|document|chunk|evidence|project|curated \
-  --project-code <code> \
-  --content-uid <uid> \
-  --document-uid <uid> \
-  --limit 20 \
-  --offset 0 \
-  --format json|table \
-  --output /path/to/search_results.json
-```
-
-012 P1 is complete after spec five-piece + index sync. **STOP** before P2 until user confirms.
 
 ---
 
