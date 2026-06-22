@@ -82,6 +82,17 @@ def test_resolve_under_root_rejects_absolute_path(tmp_path: Path) -> None:
         resolve_under_root(root, "/etc/passwd")
 
 
+def test_resolve_under_root_rejects_symlink(tmp_path: Path) -> None:
+    root = tmp_path / "curated"
+    root.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_text("secret", encoding="utf-8")
+    link = root / "escape.md"
+    link.symlink_to(outside)
+    with pytest.raises(PathTraversalError, match="symlink|escapes root"):
+        resolve_under_root(root, "escape.md")
+
+
 # --- reports glob ---
 
 
