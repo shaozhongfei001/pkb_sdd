@@ -23,6 +23,7 @@
 | 010 | `specs/010-evidence-chain/` | DONE | Evidence chain (chunk + evidence) |
 | 011 | `specs/011-curated-project-assets/` | DONE | Curated project assets (rule/template MVP) |
 | 012 | `specs/012-search-service/` | DONE | Read-only MySQL FULLTEXT search service |
+| 013 | `specs/013-streamlit-admin/` | DONE | Read-only Streamlit admin UI |
 
 ---
 
@@ -42,7 +43,6 @@ These directories are early roadmap or stub specs. They are preserved for histor
 | Directory | Status | Notes |
 |---|---|---|
 | `specs/008-review-workflow/` | FUTURE STUB / NOT CURRENT | Human review workflow. This is **not** the completed 008 parse quality checker. Do not start unless this index explicitly sets it ACTIVE. |
-| `specs/013-streamlit-admin/` | FUTURE | Streamlit admin UI (renumbered from former `012-streamlit-admin`) |
 | `specs/901-docker-compose-deployment/` | SUPPORT / FUTURE | Deployment support |
 | `specs/902-test-dataset/` | SUPPORT / FUTURE | Test dataset support |
 
@@ -75,19 +75,20 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-**No spec is currently ACTIVE.**
+**Active spec:** **None** — requires explicit **Active Spec Selection Review** before any new implementation.
 
-The most recently completed phase is:
+The most recently **completed** phase is:
 
-`012 Search Service` — `specs/012-search-service/` — **DONE**
+`013 Streamlit Admin` — `specs/013-streamlit-admin/` — **DONE**
 
-Before starting any new implementation:
+Before starting the next spec:
 
-1. Read this file (`specs/SPEC_INDEX.md`).
-2. Run explicit **Active Spec Selection Review** — do not infer active spec from directory numbering alone.
-3. Do not auto-start `013-streamlit-admin` or `008-review-workflow`.
+1. Read this file (`specs/SPEC_INDEX.md`) in full.
+2. Run **Active Spec Selection Review** with Tech Lead — do not infer the next spec from directory numbering.
+3. Do not start `008-review-workflow` unless this index explicitly sets it ACTIVE.
+4. Do not start `014` or any unlisted future spec without index update.
 
-Specs **001–012** are **DONE**. Do not re-open 012 unless a defect spec is approved.
+Specs **001–013** are **DONE**. Do not re-open a completed spec unless a defect spec is explicitly approved.
 
 ### 4.3 Completed 012 Boundary (Reference)
 
@@ -131,7 +132,44 @@ PYTHONPATH=backend python -m app.cli.main search-kb \
 
 012 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.4 Completed 011 Boundary (Reference)
+### 4.4 Completed 013 Boundary (Reference)
+
+`013-streamlit-admin` provides a **read-only** Streamlit admin UI over 001–012 contracts.
+
+It may:
+
+- read `config/app.yaml` (`mysql`, `reports_root`, `curated_root`, `pipeline_version`)
+- run `streamlit run frontend/streamlit_admin/app.py` with `PYTHONPATH=backend`
+- invoke `SearchService` in-process for KB Search (same contract as CLI `search-kb`)
+- SELECT from `kb_document`, `kb_document_chunk`, `kb_evidence`, `kb_project`, `kb_project_document`, `kb_curated_asset`, `kb_parse_run`, `kb_parse_result`, `kb_parsed_artifact`
+- optionally SELECT from `kb_file_instance`, `kb_file_content` for Inventory Snapshot page (P3 lock)
+- read `reports_root/**` for 008/009 quality report display (read-only)
+- read `curated_root/projects/**` Markdown for curated asset display (read-only)
+
+It must not:
+
+- trigger pipeline CLIs (inventory, vault, parse, evidence build, curated build, quality checker/summary)
+- read `raw_vault` binary objects (`original.bin`) or `raw_vault/**` for content display
+- read `parsed_text.md`, `parsed_metadata.json`, or `parse_manifest.json` for MVP primary views
+- modify parsed artifacts, curated files, or original user files
+- call MarkItDown, MinerU, or `magic-pdf` at runtime
+- reparse, repair, or auto-fix 008/009 quality findings from UI
+- INSERT/UPDATE/DELETE any MySQL table in MVP (SELECT-only)
+- write `kb_document_chunk`, `kb_evidence`, `kb_project`, `kb_curated_asset`, parse registry, inventory tables, `kb_review_item`, or `kb_embedding_ref`
+- hand-write FULLTEXT `MATCH ... AGAINST` SQL in UI layer (must use `SearchService`)
+- use LLM UI features, semantic similarity, embedding generation, or vector stores
+- implement review workflow (008-review-workflow scope)
+- introduce schema migration without P2 DB Review and migration script
+
+Launch:
+
+```bash
+PYTHONPATH=backend streamlit run frontend/streamlit_admin/app.py
+```
+
+013 must not be re-opened for implementation unless a new defect spec is explicitly approved.
+
+### 4.5 Completed 011 Boundary (Reference)
 
 `011-curated-project-assets` builds rule/template curated project files from 010 evidence and registry metadata.
 
@@ -172,7 +210,7 @@ PYTHONPATH=backend python -m app.cli.main build-curated-project \
 
 011 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.5 Completed 010 Boundary (Reference)
+### 4.6 Completed 010 Boundary (Reference)
 
 `010-evidence-chain` builds chunk and evidence metadata from parsed artifacts.
 
@@ -210,7 +248,7 @@ PYTHONPATH=backend python -m app.cli.main build-evidence-chain \
 
 010 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.6 Completed 009 Boundary (Reference)
+### 4.7 Completed 009 Boundary (Reference)
 
 `009-quality-report-summary` is a completed read-only report consumption phase.
 
@@ -243,7 +281,7 @@ If a future design proposes DB writes or filesystem reads beyond the 008 JSON re
 
 009 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.7 Completed 008 Boundary (Reference)
+### 4.8 Completed 008 Boundary (Reference)
 
 `008-parse-quality-checker` remains a completed read-only checker. It must not be re-opened for implementation unless a new defect spec is explicitly approved.
 

@@ -6,6 +6,8 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 PyYAML==6.0.2
 typer==0.15.1
+click>=8.1,<8.2
 rich==13.9.4
 pytest==8.3.4
 markitdown[all]>=0.1.0
+streamlit>=1.28,<1.41

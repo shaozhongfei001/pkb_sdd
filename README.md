@@ -648,9 +648,18 @@ curated/projects/{project_code}/
 
 权威边界见 `specs/SPEC_INDEX.md` §4.3。
 
-### 9.5 013-streamlit-admin（FUTURE — 未启动）
+### 9.5 013-streamlit-admin（DONE）
 
-实现 Streamlit 管理台。
+只读 Streamlit 管理台（无 parser、无 pipeline 触发、无 DB 写入 MVP）：
+
+- 页面（MVP）：KB Search、Evidence Explorer、Projects & Curated、Parse Registry、Quality Reports、Inventory Snapshot
+- Search：进程内调用 `SearchService`（与 CLI `search-kb` 同合同）
+- 只读：`reports_root` 下 008/009 报告；`curated_root` 下 Markdown
+- SELECT：`kb_document` / chunk / evidence / project / curated / parse registry 等
+- 启动：`PYTHONPATH=backend streamlit run frontend/streamlit_admin/app.py`
+- **不做：** 触发 inventory/vault/parse/build CLIs、review workflow、LLM/embed、raw_vault/parsed 读取、原始文件变更
+
+权威边界见 `specs/SPEC_INDEX.md` §4.4。
 
 ### 9.6 901-docker-compose-deployment
 

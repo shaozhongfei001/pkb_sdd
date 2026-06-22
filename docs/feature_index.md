@@ -17,7 +17,7 @@
 | 010 | 证据链 | Phase 2 | DONE |
 | 011 | 项目梳理资产 curated | Phase 2 | DONE |
 | 012 | 检索服务 | Phase 2 | DONE |
-| 013 | Streamlit 管理台 | Phase 2 | FUTURE |
+| 013 | Streamlit 管理台 | Phase 2 | DONE |
 | — | 人工复核闭环 | Phase 2 | FUTURE STUB (`specs/008-review-workflow/`，≠ 008 checker) |
 | 901 | Docker Compose 部署 | Ops | SUPPORT / FUTURE |
 | 902 | 测试样本集 | Test | SUPPORT / FUTURE |
@@ -31,5 +31,5 @@
 010-evidence-chain          = 已完成证据链（DONE）
 011-curated-project-assets  = 已完成项目梳理资产（DONE）
 012-search-service          = 已完成检索服务（DONE）
-013-streamlit-admin         = 未来管理台
+013-streamlit-admin         = 已完成只读管理台（DONE）
 ```
