@@ -23,6 +23,7 @@
 | 010 | `specs/010-evidence-chain/` | DONE | Evidence chain (chunk + evidence) |
 | 011 | `specs/011-curated-project-assets/` | DONE | Curated project assets (rule/template MVP) |
 | 012 | `specs/012-search-service/` | DONE | Read-only MySQL FULLTEXT search service |
+| 013 | `specs/013-streamlit-admin/` | DONE | Read-only Streamlit admin UI |
 
 ---
 
@@ -74,26 +75,20 @@ Agents must follow this order when selecting a spec:
 
 ### 4.2 Current Active Phase
 
-**Active spec:**
-
-`013 Streamlit Admin` — `specs/013-streamlit-admin/` — **ACTIVE / NOT IMPLEMENTED**
-
-Branch: `feature/013-streamlit-admin`
-
-Phase: P1 complete — **awaiting user review → P2 DB Review**. P4 blocked until P2/P3 PASS.
+**Active spec:** **None** — requires explicit **Active Spec Selection Review** before any new implementation.
 
 The most recently **completed** phase is:
 
-`012 Search Service` — `specs/012-search-service/` — **DONE**
+`013 Streamlit Admin` — `specs/013-streamlit-admin/` — **DONE**
 
-Before starting P4 implementation:
+Before starting the next spec:
 
-1. Read this file (`specs/SPEC_INDEX.md`) and `specs/013-streamlit-admin/` five-piece set.
-2. Complete **P2 DB Review** (SELECT-only MVP, ORM, denylist, session lifecycle).
-3. Complete **P3 Implementation Gate** (P4 whitelist).
-4. Do not start `008-review-workflow` unless this index explicitly sets it ACTIVE.
+1. Read this file (`specs/SPEC_INDEX.md`) in full.
+2. Run **Active Spec Selection Review** with Tech Lead — do not infer the next spec from directory numbering.
+3. Do not start `008-review-workflow` unless this index explicitly sets it ACTIVE.
+4. Do not start `014` or any unlisted future spec without index update.
 
-Specs **001–012** are **DONE**. Do not re-open 012 unless a defect spec is approved.
+Specs **001–013** are **DONE**. Do not re-open a completed spec unless a defect spec is explicitly approved.
 
 ### 4.3 Completed 012 Boundary (Reference)
 
@@ -137,7 +132,7 @@ PYTHONPATH=backend python -m app.cli.main search-kb \
 
 012 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
-### 4.4 Active 013 Boundary (Reference — MVP lock at P1)
+### 4.4 Completed 013 Boundary (Reference)
 
 `013-streamlit-admin` provides a **read-only** Streamlit admin UI over 001–012 contracts.
 
@@ -166,13 +161,13 @@ It must not:
 - implement review workflow (008-review-workflow scope)
 - introduce schema migration without P2 DB Review and migration script
 
-Launch (planned P4):
+Launch:
 
 ```bash
 PYTHONPATH=backend streamlit run frontend/streamlit_admin/app.py
 ```
 
-013 must not enter P4 until P2 DB Review PASS and P3 Implementation Gate PASS.
+013 must not be re-opened for implementation unless a new defect spec is explicitly approved.
 
 ### 4.5 Completed 011 Boundary (Reference)
 
